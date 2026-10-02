@@ -1,0 +1,49 @@
+# Python & Environment
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.env
+*.log
+.pytest_cache/
+.DS_Store
+
+# Academic Project Report Files & Generator Scripts (EXCLUDED)
+*.pdf
+build_*.py
+generate_*.py
+make_*.py
+append_*.py
+serve_report.py
+refine_*.py
+fix_math_escapes.py
+test_builder_skeleton.py
+test_canvas.py
+test_equation.py
+test_human_report.py
+test_logo_flowable.py
+test_script_prelim.py
+test_spacious_layout.py
+test_thesis_canvas.py
+update_app_with_login.py
+*.tex
+vit_logo.*
+
+# Generated Image Renders & Visual Previews (EXCLUDED)
+*.png
+preview_*.png
+page_*.png
+graph_*.png
+fig_*.png
+equation_*.png
+ground_truth_quiz.png
+
+# Heavy weights cache (downloaded on demand)
+*.pt
+*.bin
+*.onnx
+compile_*.py
+create_*.py
