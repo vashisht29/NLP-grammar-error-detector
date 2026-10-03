@@ -132,10 +132,11 @@ class ErrorClassifier:
 
         # 5. Informal Chat Slang & Shorthand (e.g. u -> you, what sup -> what's up, pls -> please, fr -> for real)
         chat_slang_words = (
-            "u", "r", "pls", "plz", "thx", "ty", "thnx", "tysm", "bcoz", "cuz", "bcz", "wanna", "gonna",
+            "u", "r", "ar", "wat", "wats", "wit", "wid", "dem", "dey", "dat", "dis",
+            "pls", "plz", "thx", "ty", "thnx", "tysm", "bcoz", "cuz", "bcz", "wanna", "gonna",
             "lemme", "kinda", "sorta", "idk", "idc", "dunno", "btw", "imo", "imho", "omg", "tbh", "brb", "fyi", "smh", "rn", "asap",
             "fr", "ngl", "tldr", "aka", "np", "yw",
-            "what sup", "whats up", "wassup", "wazzup", "wat sup", "wats up", "sup", "how r u", "how are u", "hru", "wru", "wyd", "wbu", "hbu"
+            "what sup", "whats up", "wassup", "wazzup", "wat sup", "wats up", "sup", "how r u", "how are u", "how ar you", "hru", "wru", "wyd", "wbu", "hbu"
         )
         if orig_lower in chat_slang_words or orig_lower.startswith("what sup") or orig_lower.startswith("whats up"):
             return (

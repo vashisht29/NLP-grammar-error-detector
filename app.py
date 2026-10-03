@@ -811,6 +811,42 @@ else:
             font-weight: 600;
         }
 
+        /* ⚠️ HINGLISH LANGUAGE MISMATCH ALERT CARD */
+        .hinglish-alert-card {
+            background: #fffbeb;
+            border: 1.5px solid #fde68a;
+            border-radius: 18px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 14px rgba(245, 158, 11, 0.08);
+            animation: fadeIn 0.25s ease-out;
+            text-align: left;
+        }
+        .hinglish-alert-badge {
+            display: inline-block;
+            background: #fef3c7;
+            color: #b45309;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 3px 8px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        .hinglish-alert-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #92400e;
+            margin-bottom: 6px;
+        }
+        .hinglish-alert-desc {
+            font-size: 0.90rem;
+            color: #b45309;
+            line-height: 1.5;
+            font-weight: 500;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
@@ -1339,6 +1375,15 @@ else:
                     <div class="status-pill-count" id="statusCountPill">3 Issues Resolved</div>
                 </div>
 
+                <!-- ⚠️ Hinglish Warning Notice Card (English Only) -->
+                <div id="hinglishAlertCard" class="hinglish-alert-card" style="display: none;">
+                    <div class="hinglish-alert-badge">Notice</div>
+                    <div class="hinglish-alert-title">⚠️ Non-English Language Detected</div>
+                    <div class="hinglish-alert-desc">
+                        This system is specifically built for English Grammatical Error Detection. Please enter your sentence in standard English only.
+                    </div>
+                </div>
+
                 <!-- Revised Text Container -->
                 <div id="revisedContainer" class="revised-liquid-box" style="display: none;">
                     <div class="revised-header-row">
@@ -1492,9 +1537,9 @@ else:
             // Switch bot to happy celebratory mode
             bot.classList.remove('thinking');
             bot.classList.add('happy');
-            const isHinglish = data.errors && data.errors.some(e => e.error_type && e.error_type.includes("Hinglish"));
+            const isHinglish = data.is_hinglish || (data.errors && data.errors.some(e => e.error_type && e.error_type.includes("Hinglish")));
             if (isHinglish) {
-                botSpeech.innerText = "Write only English! ⚠️";
+                botSpeech.innerText = "Please write only English! ⚠️";
             } else if (data.is_grammatically_correct) {
                 botSpeech.innerText = "Clean & flawless! 🎉";
             } else {
@@ -1532,26 +1577,29 @@ else:
             const problemsSection = document.getElementById('problemsSection');
             const problemsScrollBox = document.getElementById('problemsScrollBox');
             const problemsBadgeTag = document.getElementById('problemsBadgeTag');
+            const hinglishAlertCard = document.getElementById('hinglishAlertCard');
 
             checkingPanel.style.display = 'none';
             resultsContent.style.display = 'flex';
 
-            const isHinglish = data.errors && data.errors.some(e => e.error_type && e.error_type.includes("Hinglish"));
+            const isHinglish = data.is_hinglish || (data.errors && data.errors.some(e => e.error_type && e.error_type.includes("Hinglish")));
 
             if (isHinglish) {
                 statusStrip.className = "status-header-strip has-errors";
                 statusStrip.style.background = "#fffbeb";
                 statusStrip.style.borderColor = "#f59e0b";
                 statusIcon.innerText = "⚠️";
-                statusMainText.innerText = "Non-English (Hinglish) Detected";
-                statusCountPill.innerText = "Write in English Only";
+                statusMainText.innerText = "Non-English Language Detected";
+                statusCountPill.innerText = "English Only";
                 statusCountPill.style.background = "#fef3c7";
                 statusCountPill.style.color = "#b45309";
 
+                if (hinglishAlertCard) hinglishAlertCard.style.display = 'block';
                 allCleanBox.style.display = 'none';
-                revisedContainer.style.display = 'block';
-                correctedText.innerText = "Please write your sentence in English only. (कृपया केवल अंग्रेजी वाक्य लिखें)";
+                revisedContainer.style.display = 'none';
+                problemsSection.style.display = 'none';
             } else if (data.is_grammatically_correct) {
+                if (hinglishAlertCard) hinglishAlertCard.style.display = 'none';
                 statusStrip.className = "status-header-strip all-clean";
                 statusStrip.style.background = "";
                 statusStrip.style.borderColor = "";
@@ -1565,6 +1613,7 @@ else:
                 problemsSection.style.display = 'none';
                 allCleanBox.style.display = 'block';
             } else {
+                if (hinglishAlertCard) hinglishAlertCard.style.display = 'none';
                 statusStrip.className = "status-header-strip has-errors";
                 statusStrip.style.background = "";
                 statusStrip.style.borderColor = "";
@@ -1579,7 +1628,7 @@ else:
                 correctedText.innerText = data.corrected_sentence || data.original_sentence;
             }
 
-            if (!data.is_grammatically_correct && data.errors && data.errors.length > 0) {
+            if (!isHinglish && !data.is_grammatically_correct && data.errors && data.errors.length > 0) {
                 // Render Vertically Scrollable Problem Items
                 problemsSection.style.display = 'flex';
                 problemsBadgeTag.innerText = `${data.errors.length} Detected ${data.errors.length > 1 ? 'Issues' : 'Issue'}`;

@@ -11,6 +11,15 @@ from typing import Tuple, List, Dict
 CHAT_SHORTCUTS: Dict[str, str] = {
     "u": "you",
     "r": "are",
+    "ar": "are",
+    "wat": "what",
+    "wats": "what's",
+    "wit": "with",
+    "wid": "with",
+    "dem": "them",
+    "dey": "they",
+    "dat": "that",
+    "dis": "this",
     "pls": "please",
     "plz": "please",
     "plzz": "please",
@@ -294,6 +303,31 @@ SPLIT_COMPOUNDS: Dict[str, str] = {
     "tooth ache": "toothache",
     "rain fall": "rainfall",
     "snow fall": "snowfall",
+    "gan g": "gang",
+    "pla y": "play",
+    "som e": "some",
+    "thin g": "thing",
+    "friend s": "friends",
+    "car s": "cars",
+    "to gether": "together",
+    "to morrow": "tomorrow",
+    "al ways": "always",
+    "be cause": "because",
+    "an other": "another",
+    "for ever": "forever",
+    "mean while": "meanwhile",
+    "through out": "throughout",
+    "there fore": "therefore",
+    "more over": "moreover",
+    "some times": "sometimes",
+    "any more": "anymore",
+    "over come": "overcome",
+    "under stand": "understand",
+    "under standing": "understanding",
+    "down load": "download",
+    "up load": "upload",
+    "up date": "update",
+    "web site": "website",
     "foot ball": "football",
     "basket ball": "basketball",
     "base ball": "baseball",
@@ -308,6 +342,13 @@ GREETING_PATTERNS: List[Tuple[str, str]] = [
     (r'\bwhats\s+up\b', "what's up"),
     (r'\bhow\s+r\s+u\b', "how are you"),
     (r'\bhow\s+are\s+u\b', "how are you"),
+    (r'\bhow\s+ar\s+you\b', "how are you"),
+    (r'\bhow\s+ar\s+u\b', "how are you"),
+    (r'\bwho\s+ar\s+you\b', "who are you"),
+    (r'\bwho\s+ar\s+they\b', "who are they"),
+    (r'\bwhere\s+ar\s+you\b', "where are you"),
+    (r'\b(we|they|you)\s+ar\b', r"\1 are"),
+    (r'\bar\s+you\b', "are you"),
     (r'\bhru\b', "how are you"),
     (r'\bwru\b', "where are you"),
     (r'\bwyd\b', "what are you doing"),
@@ -341,12 +382,67 @@ INDIAN_ENGLISH_COLLOCATIONS: List[Tuple[str, str, str]] = [
     (r'\bgave\s+(?:an?\s+)?exam\b', 'took an exam', "Idiom / Calque: Use 'took an exam'."),
 ]
 
-
 class ChatNormalizer:
     """
     Normalizes conversational, chat, and informal social media English
     into standard English while tracking exact modifications.
     """
+
+    @classmethod
+    def rejoin_accidental_gaps(cls, text: str) -> Tuple[str, List[Dict[str, str]]]:
+        """
+        Rejoins accidental spacing and gaps that split words into fragments.
+        e.g. 'gan g' -> 'gang', 'amazin g' -> 'amazing', 'pla y' -> 'play', 'friend s' -> 'friends'.
+        """
+        from .spellchecker import SpellChecker
+        SpellChecker._initialize()
+
+        DO_NOT_EXTEND = {
+            'the', 'that', 'this', 'they', 'them', 'their', 'from', 'with', 'have',
+            'what', 'when', 'where', 'which', 'will', 'shall', 'would', 'could',
+            'should', 'about', 'into', 'onto', 'than', 'then', 'some', 'many',
+            'more', 'most', 'each', 'much', 'such', 'both', 'only', 'very',
+            'here', 'there', 'were', 'been', 'being', 'your', 'ours', 'are', 'was'
+        }
+
+        changes = []
+
+        # 1. Trailing non-standalone single letters: e.g. 'gan g' -> 'gang', 'amazin g' -> 'amazing'
+        def fix_trailing(m):
+            w = m.group(1)
+            ch = m.group(2)
+            if w.lower() in DO_NOT_EXTEND:
+                return m.group(0)
+            joined = (w + ch).lower()
+            if SpellChecker.is_valid_word(joined):
+                w_freq = SpellChecker._WORD_FREQ.get(w.lower(), 0)
+                j_freq = SpellChecker._WORD_FREQ.get(joined, 0)
+                if w_freq > 0 and j_freq > 0 and (w_freq > 50 * j_freq):
+                    return m.group(0)
+                target = (w + ch) if not w[0].isupper() else (w[0] + w[1:] + ch)
+                changes.append({"original": f"{w} {ch}", "normalized": target, "type": "Accidental Word Gap"})
+                return target
+            return m.group(0)
+
+        res = re.sub(r'\b([a-zA-Z]{2,})\s+([bcdefghjklmnopqrstuvwxyz])\b', fix_trailing, text)
+
+        # 2. Leading non-standalone single letters: e.g. 't he' -> 'the', 'w hat' -> 'what', 'h ey' -> 'hey'
+        DO_NOT_MERGE_LEADING = {'up', 'on', 'in', 'to', 'at', 'it', 'is', 'he', 'we', 'do', 'go', 'no', 'so', 'me', 'my', 'by', 'an', 'as', 'if', 'or', 'of', 'us'}
+
+        def fix_leading(m):
+            ch = m.group(1)
+            w = m.group(2)
+            if w.lower() in DO_NOT_MERGE_LEADING:
+                return m.group(0)
+            joined = (ch + w).lower()
+            if SpellChecker.is_valid_word(joined):
+                target = (ch + w) if not ch.isupper() else (ch.upper() + w.lower())
+                changes.append({"original": f"{ch} {w}", "normalized": target, "type": "Accidental Word Gap"})
+                return target
+            return m.group(0)
+
+        res = re.sub(r"(?<!['’])\b([bcdefghjklmnopqrstuvwxyz])\s+([a-zA-Z]{2,})\b", fix_leading, res)
+        return res, changes
 
     @classmethod
     def normalize(cls, text: str) -> Tuple[str, List[Dict[str, str]]]:
@@ -355,6 +451,10 @@ class ChatNormalizer:
         """
         revised = text
         changes = []
+
+        # -2. Accidental word-gap rejoining (e.g. 'gan g' -> 'gang', 'amazin g' -> 'amazing')
+        revised, gap_changes = cls.rejoin_accidental_gaps(revised)
+        changes.extend(gap_changes)
 
         # -1. Split Compound Words (e.g. 'wel come' -> 'welcome', 'with out' -> 'without')
         for split_form, unified in SPLIT_COMPOUNDS.items():

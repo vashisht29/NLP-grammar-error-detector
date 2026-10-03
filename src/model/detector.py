@@ -47,10 +47,12 @@ class DetectionResult:
     overall_confidence: float
     processing_time_ms: float
     model_backend: str
+    is_hinglish: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         res = asdict(self)
         res["errors"] = [e.to_dict() for e in self.errors]
+        res["is_hinglish"] = self.is_hinglish
         return res
 
 
@@ -224,27 +226,16 @@ class DeepGrammarDetector:
         # 0. Hinglish / Non-English Language Detection Guardrail
         is_hinglish, hinglish_conf, hinglish_markers = HinglishDetector.check_hinglish(clean_sentence)
         if is_hinglish:
-            markers_str = ", ".join(f"'{m}'" for m in hinglish_markers[:3])
-            err = GrammarError(
-                error_id=1,
-                original_text=clean_sentence,
-                original_span=(0, len(clean_sentence)),
-                original_tokens=clean_sentence.split(),
-                suggested_text="Please enter standard English text.",
-                suggested_tokens=["Please", "enter", "standard", "English", "text."],
-                error_type="Language Mismatch (Hinglish Detected)",
-                explanation=f"Romanized Hindi / Hinglish phrasing detected ({markers_str}). This system is specifically trained for English Grammatical Error Detection. Please rewrite your sentence in standard English.",
-                confidence=round(hinglish_conf, 2)
-            )
             return DetectionResult(
                 original_sentence=clean_sentence,
                 is_grammatically_correct=False,
-                error_count=1,
-                corrected_sentence="⚠️ Non-English (Hinglish) Detected. Please enter sentences in English only.",
-                errors=[err],
+                error_count=0,
+                corrected_sentence="",
+                errors=[],
                 overall_confidence=round(hinglish_conf, 2),
                 processing_time_ms=round((time.perf_counter() - start_time) * 1000, 2),
-                model_backend=self.backend
+                model_backend=self.backend,
+                is_hinglish=True
             )
 
         if clean_sentence in self._cache:
@@ -395,6 +386,7 @@ class DeepGrammarDetector:
                         early_stopping=True
                     )
                 neural_output = self.tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+                neural_output = re.sub(r"\b(what|that|it|there|who|how|here)'s(up|a|an|the|good|ready|nice|coming)\b", r"\1's \2", neural_output, flags=re.I)
 
                 # Neural Hallucination Guard: Ensure Transformer never invents non-existent English words
                 words = re.findall(r'\b[A-Za-z]+\b', neural_output)
@@ -414,6 +406,7 @@ class DeepGrammarDetector:
 
     def _heuristic_correction(self, text: str) -> str:
         corrected = text
+        corrected = re.sub(r"\b(what|that|it|there|who|how|here)'s(up|a|an|the|good|ready|nice|coming)\b", r"\1's \2", corrected, flags=re.I)
         # 0. Conversational Chat & Informal Text Normalization
         corrected, _ = ChatNormalizer.normalize(corrected)
 
@@ -1021,7 +1014,7 @@ class DeepGrammarDetector:
             error_id += 1
 
         KNOWN_MULTIWORD_SLANG = {
-            'what sup', 'wat sup', 'whats up', 'wassup', 'wazzup', 'how r u', 'how are u',
+            'what sup', 'wat sup', 'whats up', 'wassup', 'wazzup', 'how r u', 'how are u', 'how ar you', 'how ar u',
             'gud mrng', 'gud nyt', 'gm', 'gn', 'cousin brother', 'cousin sister',
             'revert back', 'do the needful', 'out of station', 'cope up with'
         }
@@ -1035,7 +1028,26 @@ class DeepGrammarDetector:
                 emit_error(start_i, end_i, start_j, end_j)
                 return
 
-            # 2. Compound word merger decomposition (e.g. 'wel come' -> 'welcome')
+            # 1b. Multi-word slang sub-slice decomposition (e.g. 'hey what sup' -> 'hey' + 'what sup')
+            if len(o_toks) > 1:
+                for sz in (3, 2):
+                    if len(o_toks) >= sz:
+                        for a in range(len(o_toks) - sz + 1):
+                            combo_phrase = " ".join(o_toks[a:a + sz]).lower()
+                            if combo_phrase in KNOWN_MULTIWORD_SLANG:
+                                for b in range(len(c_toks)):
+                                    for c_sz in (1, 2, 3):
+                                        if b + c_sz <= len(c_toks):
+                                            c_phrase = " ".join(c_toks[b:b + c_sz]).lower().rstrip(',.!?')
+                                            if c_phrase in ("what's up", "how are you", "good morning", "good night", "cousin", "reply", "welcome", "without"):
+                                                if a > 0 or b > 0:
+                                                    decompose_and_process(start_i, start_i + a, start_j, start_j + b)
+                                                emit_error(start_i + a, start_i + a + sz, start_j + b, start_j + b + c_sz)
+                                                if (a + sz < len(o_toks)) or (b + c_sz < len(c_toks)):
+                                                    decompose_and_process(start_i + a + sz, end_i, start_j + b + c_sz, end_j)
+                                                return
+
+            # 2. Compound word merger decomposition (e.g. 'wel come' -> 'welcome', 'gan g' -> 'gang')
             if len(o_toks) > 1:
                 for a in range(len(o_toks) - 1):
                     combo = (o_toks[a] + o_toks[a + 1]).lower()
