@@ -45,6 +45,16 @@ class TestGrammarDetector(unittest.TestCase):
         types = [e.error_type for e in result.errors]
         self.assertIn("Preposition Error", types)
 
+    def test_complex_multiclause_sentence(self):
+        sentence = "The student which was siting in the back of the class room did not payed attention to the teacher because he was look at his phone and write texts to his friends even though the exam is tomorrow morning."
+        result = self.detector.detect(sentence)
+        self.assertFalse(result.is_grammatically_correct)
+        self.assertGreaterEqual(result.error_count, 5)
+        self.assertIn("who was sitting", result.corrected_sentence)
+        self.assertIn("classroom", result.corrected_sentence)
+        self.assertIn("did not pay attention", result.corrected_sentence)
+        self.assertIn("was looking at his phone and writing texts", result.corrected_sentence)
+
     def test_clean_sentence(self):
         clean = "The quick brown fox jumps over the lazy dog."
         result = self.detector.detect(clean)

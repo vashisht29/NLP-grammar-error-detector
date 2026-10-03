@@ -261,15 +261,164 @@ class SyntacticReasoningEngine:
         return text, False
 
     @classmethod
+    def fix_relative_pronouns(cls, text: str) -> Tuple[str, List[Dict[str, str]]]:
+        """
+        Replaces 'which' with 'who' when referring to human antecedents.
+        e.g. 'The student which was sitting' -> 'The student who was sitting'
+             'The teacher which explained' -> 'The teacher who explained'
+        """
+        HUMAN_NOUNS = (
+            r'student|students|teacher|teachers|person|people|man|men|woman|women|boy|boys|girl|girls|'
+            r'child|children|friend|friends|doctor|doctors|driver|drivers|worker|workers|author|authors|'
+            r'player|players|officer|officers|leader|leaders|parent|parents|guy|guys|lady|ladies|'
+            r'colleague|colleagues|classmate|classmates|roommate|roommates|professor|professors|scientist|scientists|'
+            r'candidate|candidates|employee|employees|member|members|citizen|citizens|actor|actress|actors|actresses'
+        )
+        pat = r'\b((?:the\s+|a\s+|an\s+|this\s+|that\s+|these\s+|those\s+|my\s+|our\s+|their\s+|his\s+|her\s+)?[a-zA-Z\-]+\s+(?:' + HUMAN_NOUNS + r')|' + HUMAN_NOUNS + r')\s*(,)?\s+which\b'
+        def repl(m):
+            head = m.group(1)
+            comma = m.group(2) or ''
+            return f"{head}{comma} who"
+
+        corrected = text
+        changes = []
+        for m in list(re.finditer(pat, corrected, re.IGNORECASE)):
+            orig = m.group(0)
+            rep = repl(m)
+            corrected = corrected[:m.start()] + rep + corrected[m.end():]
+            changes.append({"original": orig, "replacement": rep, "type": "relative_pronoun"})
+        return corrected, changes
+
+    @classmethod
+    def fix_auxiliary_verb_concord(cls, text: str) -> Tuple[str, List[Dict[str, str]]]:
+        """
+        Ensures base verb form after do/does/did (e.g. 'did not payed' -> 'did not pay', 'did not went' -> 'did not go').
+        """
+        PAST_TO_BASE = {
+            "payed": "pay", "paid": "pay", "went": "go", "saw": "see", "came": "come",
+            "wrote": "write", "took": "take", "knew": "know", "ate": "eat", "spoke": "speak",
+            "bought": "buy", "brought": "bring", "ran": "run", "gave": "give", "found": "find",
+            "told": "tell", "heard": "hear", "felt": "feel", "left": "leave", "lost": "lose",
+            "thought": "think", "taught": "teach", "caught": "catch", "broke": "break",
+            "chose": "choose", "drove": "drive", "fell": "fall", "forgot": "forget",
+            "got": "get", "had": "have", "made": "make", "met": "meet", "said": "say",
+            "sent": "send", "slept": "sleep", "spent": "spend", "stood": "stand",
+            "understood": "understand", "won": "win", "began": "begin", "drank": "drink",
+            "sang": "sing", "swam": "swim", "flew": "fly", "grew": "grow", "threw": "throw",
+            "hid": "hide", "rode": "ride", "woke": "wake", "froze": "freeze"
+        }
+        pat = r'\b(did\s+not|didn\'?t|does\s+not|doesn\'?t|do\s+not|don\'?t)\s+([a-zA-Z]+)\b'
+        corrected = text
+        changes = []
+        for m in list(re.finditer(pat, corrected, re.IGNORECASE)):
+            aux = m.group(1)
+            verb = m.group(2)
+            verb_low = verb.lower()
+            base = None
+            if verb_low in PAST_TO_BASE:
+                base = PAST_TO_BASE[verb_low]
+            elif verb_low.endswith("ied") and len(verb_low) > 4:
+                base = verb_low[:-3] + "y"
+            elif verb_low.endswith("ed") and len(verb_low) > 4:
+                cand1 = verb_low[:-2]
+                cand2 = verb_low[:-1]
+                from .spellchecker import SpellChecker
+                if SpellChecker.is_valid_word(cand1):
+                    base = cand1
+                elif SpellChecker.is_valid_word(cand2):
+                    base = cand2
+                else:
+                    base = cand1
+            if base:
+                if verb[0].isupper():
+                    base = base.capitalize()
+                rep = f"{aux} {base}"
+                orig = m.group(0)
+                corrected = corrected[:m.start()] + rep + corrected[m.end():]
+                changes.append({"original": orig, "replacement": rep, "type": "auxiliary_concord"})
+        return corrected, changes
+
+    @classmethod
+    def fix_continuous_aspect(cls, text: str) -> Tuple[str, List[Dict[str, str]]]:
+        """
+        Corrects base verbs to continuous present participles (-ing) after auxiliary be when followed by preposition/object.
+        e.g. 'he was look at his phone' -> 'he was looking at his phone'
+             'she was wait for the bus' -> 'she was waiting for the bus'
+             'they were listen to music' -> 'they were listening to music'
+        """
+        BASE_TO_ING = {
+            "look": "looking", "listen": "listening", "wait": "waiting", "talk": "talking",
+            "speak": "speaking", "stare": "staring", "glance": "glancing", "point": "pointing",
+            "laugh": "laughing", "smile": "smiling", "focus": "focusing", "play": "playing",
+            "work": "working", "study": "studying", "read": "reading", "write": "writing",
+            "eat": "eating", "drink": "drinking", "sleep": "sleeping", "walk": "walking",
+            "run": "running", "drive": "driving", "watch": "watching", "chat": "chatting",
+            "text": "texting", "sit": "sitting", "stand": "standing", "think": "thinking"
+        }
+        pat = r'\b(was|were|is|are|am)\s+(?:(\w+ly)\s+)?([a-zA-Z]+)\b(?=\s+(?:at|for|to|with|on|in|about|into|towards|from|over|(?:his|her|their|my|our|the|a|an)\s+[a-zA-Z]+))'
+        corrected = text
+        changes = []
+        for m in list(re.finditer(pat, corrected, re.IGNORECASE)):
+            aux = m.group(1)
+            adv = m.group(2) or ''
+            verb = m.group(3).lower()
+            if verb in BASE_TO_ING:
+                ing = BASE_TO_ING[verb]
+                adv_part = f"{adv} " if adv else ""
+                rep = f"{aux} {adv_part}{ing}"
+                orig = m.group(0)
+                corrected = corrected[:m.start()] + rep + corrected[m.end():]
+                changes.append({"original": orig, "replacement": rep, "type": "continuous_aspect"})
+        return corrected, changes
+
+    @classmethod
+    def fix_parallel_participle_coordination(cls, text: str) -> Tuple[str, List[Dict[str, str]]]:
+        """
+        Enforces parallel continuous aspect in conjoined predicate clauses sharing auxiliary.
+        e.g. 'was looking at his phone and write texts' -> 'was looking at his phone and writing texts'
+             'was sitting in class and read' -> 'was sitting in class and reading'
+        """
+        BASE_TO_ING = {
+            "write": "writing", "read": "reading", "talk": "talking", "play": "playing",
+            "listen": "listening", "watch": "watching", "eat": "eating", "drink": "drinking",
+            "sleep": "sleeping", "work": "working", "study": "studying", "do": "doing",
+            "make": "making", "send": "sending", "take": "taking", "give": "giving",
+            "run": "running", "walk": "walking", "text": "texting", "chat": "chatting",
+            "look": "looking", "smile": "smiling", "laugh": "laughing"
+        }
+        pat = r'(\b(?:was|were|is|are|am)\s+(?:[a-zA-Z]+ly\s+)?[a-zA-Z]+ing\b[^,;\n]+?\s+(?:and|or)\s+)([a-zA-Z]+)\b(?=\s+(?:to|for|with|at|about|in|on|into|(?:his|her|their|my|our|the|a|an)\s+[a-zA-Z]+|[a-zA-Z]+s\b))'
+        corrected = text
+        changes = []
+        for m in list(re.finditer(pat, corrected, re.IGNORECASE)):
+            lead = m.group(1)
+            verb = m.group(2).lower()
+            if verb in BASE_TO_ING:
+                ing = BASE_TO_ING[verb]
+                rep = f"{lead}{ing}"
+                orig = m.group(0)
+                corrected = corrected[:m.start()] + rep + corrected[m.end():]
+                changes.append({"original": orig, "replacement": rep, "type": "parallel_structure"})
+        return corrected, changes
+
+    @classmethod
     def apply_all(cls, text: str) -> str:
         """Applies full syntactic and clausal reasoning pipeline."""
         result = text
         # Step 1: Pre-segment evaluative run-on
         result, _ = cls.split_evaluative_runon(result)
-        # Step 2: Question inversion
+        # Step 2: Relative pronoun concord (student which -> student who)
+        result, _ = cls.fix_relative_pronouns(result)
+        # Step 3: Question inversion
         result, _ = cls.fix_question_inversion(result)
-        # Step 3: Spatial prepositions
+        # Step 4: Spatial prepositions
         result, _ = cls.fix_spatial_location_prepositions(result)
-        # Step 4: Bare participle auxiliaries
+        # Step 5: Bare participle auxiliaries
         result, _ = cls.fix_bare_participle_auxiliaries(result)
+        # Step 6: Auxiliary verb concord (did not payed -> did not pay)
+        result, _ = cls.fix_auxiliary_verb_concord(result)
+        # Step 7: Continuous aspect (was look at -> was looking at)
+        result, _ = cls.fix_continuous_aspect(result)
+        # Step 8: Parallel participle coordination (was looking ... and write -> and writing)
+        result, _ = cls.fix_parallel_participle_coordination(result)
         return result
+

@@ -450,6 +450,16 @@ class DeepGrammarDetector:
                     neural_output = re.sub(r'\b(are|were|do|did|can|could|will|would|should)\s+we\b', r'\1 you', neural_output, flags=re.I)
                     neural_output = re.sub(r'\bwe\s+(are|were|have|can|could|will|would|should)\b', r'you \1', neural_output, flags=re.I)
 
+                # Protect relative clause structure (prevent neural model from dropping relative pronoun clause 'who was/is')
+                if re.search(r'\b(which|who)\s+(was|were|is|are)\b', sentence, re.I):
+                    aux_tense = 'was' if 'was' in sentence.lower() else ('were' if 'were' in sentence.lower() else ('is' if 'is' in sentence.lower() else 'are'))
+                    neural_output = re.sub(
+                        r'\b((?:the\s+|a\s+|an\s+|this\s+|that\s+)?[a-zA-Z\-]+\s+(?:student|teacher|person|people|man|men|woman|women|boy|boys|girl|girls|child|children|friend|friends))\s+([a-zA-Z]+ing)\b',
+                        rf'\1 who {aux_tense} \2',
+                        neural_output,
+                        flags=re.I
+                    )
+
                 # Step 2: Post-process to ensure all linguistic constraints are preserved
                 return self._heuristic_correction(neural_output)
             except Exception as e:

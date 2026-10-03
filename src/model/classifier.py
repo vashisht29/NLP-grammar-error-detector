@@ -243,6 +243,7 @@ class ErrorClassifier:
             ("perspective", "prospective"): "Confused word: 'prospective' means potential; 'perspective' means viewpoint.",
             ("prospective", "perspective"): "Confused word: 'perspective' means viewpoint; 'prospective' means potential.",
             ("assure", "ensure"): "Confused word: 'ensure' means make certain; 'assure' means remove doubt.",
+            ("siting", "sitting"): "Contextual spelling / confused word: In locative posture contexts, use 'sitting' (from 'to sit') rather than 'siting'.",
         }
         if (orig_lower, corr_lower) in confused_map:
             msg = confused_map[(orig_lower, corr_lower)]
@@ -318,7 +319,42 @@ class ErrorClassifier:
             )
 
 
-        # 1c. WH-Question Inversion & Interrogative Syntax
+        # 1a. Relative Pronoun Concord (e.g. which -> who/whom/whose after human antecedent)
+        if orig_lower == "which" and corr_lower in ("who", "whom", "whose"):
+            return (
+                "Relative Pronoun Concord",
+                f"Relative pronoun error: Use '{corr_str}' (not '{orig_str}') to refer to people or human antecedents (e.g., 'student {corr_str}').",
+                0.97
+            )
+
+        # 1b. Auxiliary Verb Concord (did not payed -> pay / did not went -> go / do/does/did + base verb)
+        if any(w in (x.lower() for x in context_before[-3:]) for w in ("did", "didn't", "does", "doesn't", "do", "don't")):
+            past_forms = ("payed", "paid", "went", "saw", "came", "wrote", "took", "knew", "ate", "spoke", "had", "bought", "played")
+            if orig_lower in past_forms or (orig_lower.endswith("ed") and corr_lower in (orig_lower[:-2], orig_lower[:-1])):
+                prev_aux = next((w for w in reversed(context_before[-3:]) if w.lower() in ("did", "didn't", "does", "doesn't", "do", "don't")), "did")
+                return (
+                    "Auxiliary Verb Concord",
+                    f"Auxiliary verb concord: The auxiliary '{prev_aux}' already carries past tense; the main verb must remain in the bare base form ('{corr_str}', not '{orig_str}').",
+                    0.97
+                )
+
+        # 1c. Continuous Aspect & Parallel Participle Coordination
+        if corr_lower.endswith("ing") and (corr_lower == orig_lower + "ing" or corr_lower == orig_lower[:-1] + "ing" or (orig_lower, corr_lower) in (("write", "writing"), ("sit", "sitting"), ("run", "running"), ("look", "looking"))):
+            if any(w.lower() in ("and", "or") for w in context_before[-3:]) and any(w.lower() in ("was", "were", "is", "are", "am", "looking", "sitting", "playing", "reading", "working", "studying") or w.lower().endswith("ing") for w in context_before[-10:]):
+                return (
+                    "Parallel Structure",
+                    f"Parallel structure error: Conjoined actions sharing the continuous auxiliary aspect ('... and {corr_str}') must maintain matching participle form, not base form '{orig_str}'.",
+                    0.96
+                )
+            prev_be = next((w.lower() for w in reversed(context_before[-8:]) if w.lower() in ("was", "were", "is", "are", "am")), None)
+            if prev_be:
+                return (
+                    "Continuous Aspect Error",
+                    f"Continuous aspect error: Continuous tense requires the auxiliary verb '{prev_be}' followed by the present participle (-ing) form: '{corr_str}' (not base form '{orig_str}').",
+                    0.96
+                )
+
+        # 1d. WH-Question Inversion & Interrogative Syntax
         if (any(orig_lower.startswith(wh) for wh in ("why", "what", "where", "when", "how", "who")) or (orig_lower, corr_lower) in (("this is", "are they"), ("this is", "is he"), ("this is", "is she"), ("you are", "are you"), ("they are", "are they"), ("he is", "is he"), ("she is", "is she")) or (any(wh in (x.lower() for x in context_before) for wh in ("why", "what", "where", "when", "how", "who")) and any(aux in corr_lower.split() for aux in ("are", "is", "were", "was")))) and any(aux in corr_lower.split() for aux in ("are", "is", "were", "was", "do", "does", "did", "can", "could", "will", "would", "should")):
             return (
                 "Interrogative Syntax & Pronoun Concord",

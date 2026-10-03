@@ -87,6 +87,18 @@ CONFUSED_WORD_RULES = [
         "Use possessive pronoun 'their' before a noun, not adverb 'there'."
     ),
 
+    # 4b. siting vs sitting
+    (
+        r'\b(was|were|is|are|am|been|being)\s+siting\b',
+        r'\1 sitting',
+        "Contextual spelling / confused word: Use 'sitting' (from verb 'to sit')."
+    ),
+    (
+        r'\bsiting\s+(in|on|at|down|there|here|next|behind|beside|near|by)\b',
+        r'sitting \1',
+        "Contextual spelling / confused word: In locative posture contexts, use 'sitting' instead of rare homograph 'siting'."
+    ),
+
     # 5. your vs you're
     (
         r'\byour\s+(welcome|going|doing|coming|the\s+best|right|wrong|leaving|making|ready|redy|sure|able|happy|glad)\b',
