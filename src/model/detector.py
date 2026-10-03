@@ -12,11 +12,13 @@ from typing import List, Tuple, Dict, Any, Optional
 from .config import ModelConfig
 from .classifier import ErrorClassifier
 from .spellchecker import SpellChecker
+import os
 from .homophones import HomophoneEngine
 from .gender_collocations import GenderCollocationEngine
 from .chat_normalizer import ChatNormalizer
 from .lexicon import LexicalSemantics
 from .language_detector import HinglishDetector
+from .semantic_roles import SemanticRoleEngine
 
 
 @dataclass
@@ -238,6 +240,47 @@ class DeepGrammarDetector:
                 is_hinglish=True
             )
 
+        # Check if an Independent Remote/Local LLM Backend Server is active
+        llm_backend_url = os.environ.get("LLM_BACKEND_URL", "").strip().rstrip("/")
+        if llm_backend_url:
+            try:
+                import urllib.request
+                import json
+                req = urllib.request.Request(
+                    f"{llm_backend_url}/api/detect",
+                    data=json.dumps({"sentence": clean_sentence}).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "User-Agent": "GED-Client"}
+                )
+                with urllib.request.urlopen(req, timeout=4.0) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        err_objs = []
+                        for idx, err in enumerate(data.get("errors", []), 1):
+                            err_objs.append(GrammarError(
+                                error_id=err.get("error_id", idx),
+                                original_text=err.get("original_text", ""),
+                                original_span=tuple(err.get("original_span", [0, 0])),
+                                original_tokens=err.get("original_tokens", []),
+                                suggested_text=err.get("suggested_text", ""),
+                                suggested_tokens=err.get("suggested_tokens", []),
+                                error_type=err.get("error_type", "Grammar Error"),
+                                explanation=err.get("explanation", ""),
+                                confidence=err.get("confidence", 0.95)
+                            ))
+                        return DetectionResult(
+                            original_sentence=data.get("original_sentence", clean_sentence),
+                            is_grammatically_correct=data.get("is_grammatically_correct", len(err_objs) == 0),
+                            error_count=data.get("error_count", len(err_objs)),
+                            corrected_sentence=data.get("corrected_sentence", clean_sentence),
+                            errors=err_objs,
+                            overall_confidence=data.get("overall_confidence", 0.95),
+                            processing_time_ms=data.get("processing_time_ms", 15.0),
+                            model_backend=data.get("model_backend", "Independent LLM Backend (Remote/Local GPU)"),
+                            is_hinglish=data.get("is_hinglish", False)
+                        )
+            except Exception:
+                pass
+
         if clean_sentence in self._cache:
             cached = self._cache[clean_sentence]
             return DetectionResult(
@@ -324,11 +367,13 @@ class DeepGrammarDetector:
 
     def _generate_correction(self, text: str) -> str:
         """Generates grammatical correction via Neural-Hybrid Pipeline with paragraph-level sentence chunking."""
-        sentences, delimiters = self._split_into_sentences(text)
-        if len(sentences) <= 1:
+        # 0. Pre-segment conversational run-on questions and imperative clauses
+        segmented_text, was_split = SemanticRoleEngine.split_interrogative_runon(text)
+        sentences, delimiters = self._split_into_sentences(segmented_text)
+        if len(sentences) <= 1 and not was_split:
             return self._generate_single_sentence_correction(text)
 
-        # Multi-sentence paragraph: process each sentence individually to eliminate Seq2Seq token-length truncation
+        # Multi-sentence paragraph or segmented run-on: process each sentence individually
         corrected_sentences = []
         for s in sentences:
             if s:
@@ -396,6 +441,11 @@ class DeepGrammarDetector:
                         if cand:
                             neural_output = re.sub(r'\b' + re.escape(w) + r'\b', cand, neural_output)
 
+                # Protect subject pronoun consistency (prevent neural model from distorting 'you' to 'we' / 'I')
+                if re.search(r'\byou\b', sentence, re.I) and not re.search(r'\bwe\b', sentence, re.I):
+                    neural_output = re.sub(r'\b(are|were|do|did|can|could|will|would|should)\s+we\b', r'\1 you', neural_output, flags=re.I)
+                    neural_output = re.sub(r'\bwe\s+(are|were|have|can|could|will|would|should)\b', r'you \1', neural_output, flags=re.I)
+
                 # Step 2: Post-process to ensure all linguistic constraints are preserved
                 return self._heuristic_correction(neural_output)
             except Exception as e:
@@ -415,6 +465,9 @@ class DeepGrammarDetector:
 
         # 2. Gender Collocations & Semantic Concord ('she is handsome' -> 'she is beautiful')
         corrected, _ = GenderCollocationEngine.apply(corrected)
+
+        # 2b. Frame Semantics, Agent-Action Roles & Motion Destination Prepositions
+        corrected = SemanticRoleEngine.apply_all(corrected)
 
         # 3. Spelling correction across words
         def fix_spelling(m):
@@ -986,6 +1039,8 @@ class DeepGrammarDetector:
                 orig_span_text = ""
 
             corr_span_text = " ".join(sub_corr_tokens)
+            corr_span_text = re.sub(r"\s+([,.:;?!'’])", r"\1", corr_span_text)
+            corr_span_text = re.sub(r"\b([a-zA-Z]+)\s+('\w+)\b", r"\1\2", corr_span_text)
 
             context_before = orig_words[max(0, start_i - 7):start_i]
             context_after = orig_words[end_i:min(len(orig_words), end_i + 5)]

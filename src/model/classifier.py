@@ -73,7 +73,14 @@ class ErrorClassifier:
         orig_lower = orig_str.lower()
         corr_lower = corr_str.lower()
 
-        # 1. Punctuation errors
+        # 1. Punctuation & Clause Boundaries
+        if ("?" in corr_str or "!" in corr_str or ("," in corr_str and orig_lower in ("see", "look", "listen"))) and ("?" not in orig_str and "!" not in orig_str):
+            return (
+                "Sentence Structure / Punctuation",
+                f"Run-on sentence boundary: Add punctuation ('{corr_str}') to properly separate the interrogative question clause from the subsequent observation clause.",
+                0.96
+            )
+
         if cls._is_punctuation_error(orig_str, corr_str):
             src_disp = orig_str if orig_str else "[missing]"
             tgt_disp = corr_str if corr_str else "[omitted]"
@@ -254,6 +261,31 @@ class ErrorClassifier:
         }
         if (orig_lower, corr_lower) in gender_map:
             return ("Gender Collocation / Word Choice", gender_map[(orig_lower, corr_lower)], 0.96)
+
+        # 4b. Semantic Agent-Action Roles & Frame Semantics
+        agent_role_map = {
+            ("studying", "teaching"): "Semantic Role Mismatch: In an educational frame, a teacher's role is to instruct ('teaching'), whereas students 'study'. Use 'teaching' instead of 'studying'.",
+            ("study", "teach"): "Semantic Role Mismatch: Teachers 'teach', students 'study'. Use 'teach'.",
+            ("studies", "teaches"): "Semantic Role Mismatch: In this classroom context, a teacher 'teaches', whereas students 'study'. Use 'teaches'.",
+            ("studied", "taught"): "Semantic Role Mismatch: Teachers 'taught', students 'studied'. Use 'taught'.",
+            ("teaching", "studying"): "Semantic Role Mismatch: In a learning frame, students 'study/learn', while teachers 'teach'. Use 'studying'.",
+            ("teach", "study"): "Semantic Role Mismatch: Students 'study', teachers 'teach'. Use 'study'.",
+            ("teaches", "studies"): "Semantic Role Mismatch: Students 'study', teachers 'teach'. Use 'studies'.",
+            ("taught", "studied"): "Semantic Role Mismatch: Students 'studied', teachers 'taught'. Use 'studied'.",
+        }
+        orig_clean = re.sub(r'[^\w\s]', '', orig_lower).strip()
+        corr_clean = re.sub(r'[^\w\s]', '', corr_lower).strip()
+        if (orig_clean, corr_clean) in agent_role_map:
+            return ("Semantic Agent Role / Contextual Collocation", agent_role_map[(orig_clean, corr_clean)], 0.97)
+
+        # 4c. Motion Destination Prepositions to Institutions
+        if (orig_lower in ("in the school", "in the", "in school", "in", "into the school", "into the", "into") and
+            corr_lower in ("to school", "to")):
+            return (
+                "Preposition / Idiom",
+                f"Incorrect preposition/phrase '{orig_str}'. In standard English, motion towards an institution uses destination preposition 'to' ('{corr_str}').",
+                0.96
+            )
 
         # Pronoun-Antecedent Agreement ("their" -> "its" / "its" -> "their")
         if orig_lower == "their" and corr_lower == "its":

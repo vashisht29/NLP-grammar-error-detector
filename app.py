@@ -1251,6 +1251,10 @@ else:
                     <span class="title-gradient">Detector</span>
                 </h1>
                 <p>Deep Learning GED & Real-Time Linguistic Error Correction</p>
+                <div class="backend-status-pill" id="backendStatusPill" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.72rem; padding: 3px 10px; border-radius: 9999px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); color: #047857; font-weight: 600; margin-top: 4px; width: fit-content;">
+                    <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);"></span>
+                    <span id="backendStatusText">Self-Hosted LLM Engine (Apple Silicon / GPU)</span>
+                </div>
                 <div class="user-profile-badge">
                     <div class="user-avatar" id="userAvatar">HV</div>
                     <div class="user-meta">
@@ -1626,6 +1630,10 @@ else:
                 allCleanBox.style.display = 'none';
                 revisedContainer.style.display = 'block';
                 correctedText.innerText = data.corrected_sentence || data.original_sentence;
+            }
+
+            if (data.model_backend && document.getElementById('backendStatusText')) {
+                document.getElementById('backendStatusText').innerText = data.model_backend;
             }
 
             if (!isHinglish && !data.is_grammatically_correct && data.errors && data.errors.length > 0) {
