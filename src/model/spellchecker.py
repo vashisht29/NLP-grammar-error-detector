@@ -271,7 +271,7 @@ class SpellChecker:
             except Exception:
                 pass
 
-        # Protect core English inflected words (auxiliary verbs, pronouns, modals)
+        # Protect core English inflected words (auxiliary verbs, pronouns, modals, prepositions)
         CORE_VALID_WORDS = {
             "has", "had", "have", "having", "is", "are", "was", "were", "am", "be", "been", "being",
             "do", "does", "did", "doing", "done", "will", "would", "shall", "should", "can", "could",
@@ -282,10 +282,13 @@ class SpellChecker:
             "he", "she", "it", "they", "we", "you", "i", "me", "him", "her", "us", "them",
             "my", "your", "his", "her", "its", "our", "their", "this", "that", "these", "those",
             "a", "an", "the", "in", "on", "at", "to", "for", "with", "by", "from", "about",
-            "into", "through", "during", "before", "after", "above", "below", "between", "under",
+            "up", "out", "down", "off", "back", "away", "over", "into", "through", "during", "before", "after", "above", "below", "between", "under",
             "there", "here", "where", "when", "why", "how", "what", "which", "who", "whom", "whose",
-            "not", "no", "yes", "and", "or", "but", "so", "because", "if", "than", "then",
-            "very", "too", "also", "just", "now", "well", "all", "any", "some", "every", "each"
+            "not", "no", "yes", "and", "or", "but", "so", "because", "if", "than", "then", "as", "of",
+            "very", "too", "also", "just", "now", "well", "all", "any", "some", "every", "each",
+            "home", "house", "car", "room", "book", "water", "food", "people", "child", "children",
+            "man", "men", "woman", "women", "friend", "friends", "help", "need", "like", "love",
+            "welcome", "welcomes", "welcomed", "welcoming", "please", "thanks", "thank", "ok", "hi", "hey"
         }
         for cw in CORE_VALID_WORDS:
             system_dict_words.add(cw)
@@ -304,7 +307,7 @@ class SpellChecker:
                             freq = int(parts[1])
                             cls._WORD_FREQ[w] = freq
                             # ONLY add to valid dictionary if in system dictionary or extremely high frequency with vowels
-                            if w in system_dict_words or (freq > 2000000 and any(v in w for v in 'aeiouy') and len(w) >= 3 and w not in CURATED_TYPOS):
+                            if w in system_dict_words or (freq > 500000 and any(v in w for v in 'aeiouy') and len(w) >= 2 and w not in CURATED_TYPOS):
                                 cls._VALID_DICTIONARY.add(w)
             except Exception:
                 pass
