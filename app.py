@@ -1579,6 +1579,7 @@ else:
                 correctedText.innerText = data.corrected_sentence || data.original_sentence;
             }
 
+            if (!data.is_grammatically_correct && data.errors && data.errors.length > 0) {
                 // Render Vertically Scrollable Problem Items
                 problemsSection.style.display = 'flex';
                 problemsBadgeTag.innerText = `${data.errors.length} Detected ${data.errors.length > 1 ? 'Issues' : 'Issue'}`;
@@ -1631,13 +1632,20 @@ else:
 
             if (user) {
                 if (loginView) loginView.style.display = 'none';
-                if (mainView) mainView.style.display = 'flex';
+                if (mainView) {
+                    mainView.style.display = 'flex';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
                 if (nameLabel) nameLabel.innerText = user;
                 if (avatarLabel) {
-                    const initials = user.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
+                    const initials = user.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
                     avatarLabel.innerText = initials;
                 }
-                analyzeSentence();
+                try {
+                    analyzeSentence();
+                } catch(err) {
+                    console.error("Auto analyze error:", err);
+                }
             } else {
                 if (loginView) loginView.style.display = 'flex';
                 if (mainView) mainView.style.display = 'none';
@@ -1645,16 +1653,25 @@ else:
         }
 
         function handleLogin(e) {
-            if (e) e.preventDefault();
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
             const usernameInput = document.getElementById('loginUsername');
             const username = (usernameInput && usernameInput.value.trim()) || 'Harsh Vashisht';
             sessionStorage.setItem('ged_user', username);
             checkAuthState();
+            return false;
         }
 
-        function handleGuestLogin() {
+        function handleGuestLogin(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
             sessionStorage.setItem('ged_user', 'Guest Researcher');
             checkAuthState();
+            return false;
         }
 
         function handleSignOut() {
@@ -1678,14 +1695,20 @@ else:
         function setAuthTab(tab) {
             const tabs = document.querySelectorAll('.auth-tab');
             tabs.forEach(t => t.classList.remove('active'));
+            const titleEl = document.querySelector('.auth-title');
+            const subTitleEl = document.querySelector('.auth-subtitle');
+            const btnSpan = document.querySelector('.auth-btn-primary span');
+
             if (tab === 'login') {
-                tabs[0].classList.add('active');
-                document.querySelector('.auth-title').innerText = 'Welcome Back';
-                document.querySelector('.auth-btn-primary span').innerText = 'Sign In to Workspace';
+                if (tabs[0]) tabs[0].classList.add('active');
+                if (titleEl) titleEl.innerText = 'Welcome Back';
+                if (subTitleEl) subTitleEl.innerText = 'Sign in to access real-time NLP error detection & deep sequence-to-sequence grammar analytics.';
+                if (btnSpan) btnSpan.innerText = 'Sign In to Workspace';
             } else {
-                tabs[1].classList.add('active');
-                document.querySelector('.auth-title').innerText = 'Create Account';
-                document.querySelector('.auth-btn-primary span').innerText = 'Create Free Account';
+                if (tabs[1]) tabs[1].classList.add('active');
+                if (titleEl) titleEl.innerText = 'Create Account';
+                if (subTitleEl) subTitleEl.innerText = 'Sign up for instant free access to grammar correction & analytics.';
+                if (btnSpan) btnSpan.innerText = 'Sign Up & Enter Workspace';
             }
         }
 
