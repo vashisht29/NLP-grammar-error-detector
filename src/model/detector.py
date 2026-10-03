@@ -19,6 +19,7 @@ from .chat_normalizer import ChatNormalizer
 from .lexicon import LexicalSemantics
 from .language_detector import HinglishDetector
 from .semantic_roles import SemanticRoleEngine
+from .syntactic_engine import SyntacticReasoningEngine
 
 
 @dataclass
@@ -367,8 +368,11 @@ class DeepGrammarDetector:
 
     def _generate_correction(self, text: str) -> str:
         """Generates grammatical correction via Neural-Hybrid Pipeline with paragraph-level sentence chunking."""
-        # 0. Pre-segment conversational run-on questions and imperative clauses
-        segmented_text, was_split = SemanticRoleEngine.split_interrogative_runon(text)
+        # 0. Pre-segment conversational run-on questions and evaluative appraisals
+        segmented_text, was_split1 = SemanticRoleEngine.split_interrogative_runon(text)
+        segmented_text, was_split2 = SyntacticReasoningEngine.split_evaluative_runon(segmented_text)
+        was_split = was_split1 or was_split2
+
         sentences, delimiters = self._split_into_sentences(segmented_text)
         if len(sentences) <= 1 and not was_split:
             return self._generate_single_sentence_correction(text)
@@ -466,15 +470,18 @@ class DeepGrammarDetector:
         # 2. Gender Collocations & Semantic Concord ('she is handsome' -> 'she is beautiful')
         corrected, _ = GenderCollocationEngine.apply(corrected)
 
-        # 2b. Frame Semantics, Agent-Action Roles & Motion Destination Prepositions
-        corrected = SemanticRoleEngine.apply_all(corrected)
-
         # 3. Spelling correction across words
         def fix_spelling(m):
             w = m.group()
             fixed = SpellChecker.correct_word(w)
             return fixed if fixed else w
         corrected = re.sub(r'\b[A-Za-z]+\b', fix_spelling, corrected)
+
+        # 3b. Frame Semantics, Agent-Action Roles & Motion Destination Prepositions
+        corrected = SemanticRoleEngine.apply_all(corrected)
+
+        # 3c. Syntactic Reasoning: Question Inversion, Spatial Prepositions & Bare Participles
+        corrected = SyntacticReasoningEngine.apply_all(corrected)
 
         # 4. Modal Auxiliary Perfects ("could of" -> "could have", "should of" -> "should have")
         modal_perfect_patterns = [
@@ -1127,6 +1134,17 @@ class DeepGrammarDetector:
                             if (a + 1 < len(o_toks)) or (b + 2 < len(c_toks)):
                                 decompose_and_process(start_i + a + 1, end_i, start_j + b + 2, end_j)
                             return
+
+            # 3d. Leading word case-match with trailing multi-word substitution (e.g. 'why this is' -> 'Why are they')
+            if len(o_toks) > 1 and len(c_toks) > 1 and o_toks[0].lower() == c_toks[0].lower() and o_toks[0] != c_toks[0]:
+                emit_error(start_i, start_i + 1, start_j, start_j + 1)
+                decompose_and_process(start_i + 1, end_i, start_j + 1, end_j)
+                return
+
+            # 3e. Inversion / Transposition (e.g. 'this is' -> 'are they', 'you are' -> 'are you')
+            if len(o_toks) == 2 and len(c_toks) == 2 and ("are" in [w.lower() for w in c_toks] or "is" in [w.lower() for w in c_toks]):
+                emit_error(start_i, end_i, start_j, end_j)
+                return
 
             # 4. Parallel token replacements
             if len(o_toks) > 1 and len(o_toks) == len(c_toks):

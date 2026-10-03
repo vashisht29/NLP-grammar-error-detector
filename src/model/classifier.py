@@ -107,10 +107,10 @@ class ErrorClassifier:
             )
 
         # 4. Merged Word Spacing (e.g. alot -> a lot, speelingmistake -> spelling mistake, needto talkto -> need to talk to)
-        if len(corr_tokens) > len(orig_tokens):
+        if len(orig_tokens) >= 1 and len(corr_tokens) > len(orig_tokens):
             orig_no_space = "".join(orig_tokens).lower()
             corr_no_space = "".join(corr_tokens).lower()
-            if orig_no_space == corr_no_space or compute_levenshtein_distance(orig_no_space, corr_no_space) <= 4:
+            if orig_no_space == corr_no_space or (len(orig_no_space) >= 4 and compute_levenshtein_distance(orig_no_space, corr_no_space) <= 2):
                 return (
                     "Merged Word Spacing",
                     f"Missing space between words: '{orig_str}' should be written as separate words '{corr_str}'.",
@@ -317,6 +317,32 @@ class ErrorClassifier:
                 0.96
             )
 
+
+        # 1c. WH-Question Inversion & Interrogative Syntax
+        if (any(orig_lower.startswith(wh) for wh in ("why", "what", "where", "when", "how", "who")) or (orig_lower, corr_lower) in (("this is", "are they"), ("this is", "is he"), ("this is", "is she"), ("you are", "are you"), ("they are", "are they"), ("he is", "is he"), ("she is", "is she")) or (any(wh in (x.lower() for x in context_before) for wh in ("why", "what", "where", "when", "how", "who")) and any(aux in corr_lower.split() for aux in ("are", "is", "were", "was")))) and any(aux in corr_lower.split() for aux in ("are", "is", "were", "was", "do", "does", "did", "can", "could", "will", "would", "should")):
+            return (
+                "Interrogative Syntax & Pronoun Concord",
+                f"Question syntax error: Use '{corr_str}' with proper subject-auxiliary inversion and pronoun agreement instead of colloquial '{orig_str}'.",
+                0.96
+            )
+
+        # 1d. Missing Auxiliary Verb before Participle (e.g. [] -> 'are' before 'playing')
+        if not orig_str and corr_lower in ("are", "is", "were", "was", "am", "have", "has", "had", "will", "would") and any(w.endswith("ing") for w in context_after[:2]):
+            verb_target = context_after[0] if context_after else "verb"
+            return (
+                "Auxiliary Verb / Aspect",
+                f"Missing auxiliary verb: Continuous aspect requires auxiliary '{corr_str}' before '{verb_target}'.",
+                0.95
+            )
+
+        # 1e. Spatial Location Prepositions (e.g. 'the' -> 'in' / [] -> 'in' before 'class', 'room', etc.)
+        if corr_lower in ("in", "on", "at", "to", "into", "onto") and any(w in (x.lower() for x in context_after[:2]) for w in ("class", "classroom", "room", "school", "college", "ground", "road", "field", "street", "bus stop")):
+            target_loc = context_after[0] if context_after else "location"
+            return (
+                "Preposition / Idiom",
+                f"Spatial preposition required: Use preposition '{corr_str}' to specify location before '{target_loc}'.",
+                0.96
+            )
 
         # 2. Article / Determiner errors
         if cls._is_article_error(orig_tokens, corr_tokens):
