@@ -1492,7 +1492,10 @@ else:
             // Switch bot to happy celebratory mode
             bot.classList.remove('thinking');
             bot.classList.add('happy');
-            if (data.is_grammatically_correct) {
+            const isHinglish = data.errors && data.errors.some(e => e.error_type && e.error_type.includes("Hinglish"));
+            if (isHinglish) {
+                botSpeech.innerText = "Write only English! ⚠️";
+            } else if (data.is_grammatically_correct) {
                 botSpeech.innerText = "Clean & flawless! 🎉";
             } else {
                 botSpeech.innerText = `Fixed ${data.error_count} issue${data.error_count > 1 ? 's' : ''}! ✨`;
@@ -1533,24 +1536,48 @@ else:
             checkingPanel.style.display = 'none';
             resultsContent.style.display = 'flex';
 
-            if (data.is_grammatically_correct) {
+            const isHinglish = data.errors && data.errors.some(e => e.error_type && e.error_type.includes("Hinglish"));
+
+            if (isHinglish) {
+                statusStrip.className = "status-header-strip has-errors";
+                statusStrip.style.background = "#fffbeb";
+                statusStrip.style.borderColor = "#f59e0b";
+                statusIcon.innerText = "⚠️";
+                statusMainText.innerText = "Non-English (Hinglish) Detected";
+                statusCountPill.innerText = "Write in English Only";
+                statusCountPill.style.background = "#fef3c7";
+                statusCountPill.style.color = "#b45309";
+
+                allCleanBox.style.display = 'none';
+                revisedContainer.style.display = 'block';
+                correctedText.innerText = "Please write your sentence in English only. (कृपया केवल अंग्रेजी वाक्य लिखें)";
+            } else if (data.is_grammatically_correct) {
                 statusStrip.className = "status-header-strip all-clean";
+                statusStrip.style.background = "";
+                statusStrip.style.borderColor = "";
                 statusIcon.innerText = "✅";
                 statusMainText.innerText = "Flawless English — No Errors Found";
                 statusCountPill.innerText = "0 Errors";
+                statusCountPill.style.background = "";
+                statusCountPill.style.color = "";
                 
                 revisedContainer.style.display = 'none';
                 problemsSection.style.display = 'none';
                 allCleanBox.style.display = 'block';
             } else {
                 statusStrip.className = "status-header-strip has-errors";
+                statusStrip.style.background = "";
+                statusStrip.style.borderColor = "";
                 statusIcon.innerText = "✨";
                 statusMainText.innerText = "Polished & Corrected";
                 statusCountPill.innerText = `${data.error_count} ${data.error_count > 1 ? 'Issues' : 'Issue'} Resolved`;
+                statusCountPill.style.background = "";
+                statusCountPill.style.color = "";
 
                 allCleanBox.style.display = 'none';
                 revisedContainer.style.display = 'block';
                 correctedText.innerText = data.corrected_sentence || data.original_sentence;
+            }
 
                 // Render Vertically Scrollable Problem Items
                 problemsSection.style.display = 'flex';

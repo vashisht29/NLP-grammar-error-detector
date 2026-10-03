@@ -130,11 +130,12 @@ class ErrorClassifier:
                     0.96
                 )
 
-        # 5. Informal Chat Slang & Shorthand (e.g. u -> you, what sup -> what's up, pls -> please)
+        # 5. Informal Chat Slang & Shorthand (e.g. u -> you, what sup -> what's up, pls -> please, fr -> for real)
         chat_slang_words = (
-            "u", "r", "pls", "plz", "thx", "ty", "bcoz", "cuz", "bcz", "wanna", "gonna",
-            "lemme", "kinda", "idk", "btw", "imo", "omg", "tbh", "what sup", "whats up",
-            "wassup", "wazzup", "wat sup", "wats up", "sup", "how r u", "hru", "wru", "wyd"
+            "u", "r", "pls", "plz", "thx", "ty", "thnx", "tysm", "bcoz", "cuz", "bcz", "wanna", "gonna",
+            "lemme", "kinda", "sorta", "idk", "idc", "dunno", "btw", "imo", "imho", "omg", "tbh", "brb", "fyi", "smh", "rn", "asap",
+            "fr", "ngl", "tldr", "aka", "np", "yw",
+            "what sup", "whats up", "wassup", "wazzup", "wat sup", "wats up", "sup", "how r u", "how are u", "hru", "wru", "wyd", "wbu", "hbu"
         )
         if orig_lower in chat_slang_words or orig_lower.startswith("what sup") or orig_lower.startswith("whats up"):
             return (
@@ -142,6 +143,24 @@ class ErrorClassifier:
                 f"Informal conversational expression '{orig_str}' converted to standard English '{corr_str}'.",
                 0.95
             )
+
+        # 5b. Indian English Calques & Collocations
+        indian_collocations = {
+            ("cousin brother", "cousin"): "Collocation: In English, simply use 'cousin' rather than 'cousin brother'.",
+            ("cousin sister", "cousin"): "Collocation: In English, simply use 'cousin' rather than 'cousin sister'.",
+            ("cousins brothers", "cousins"): "Collocation: In English, simply use 'cousins'.",
+            ("cousins sisters", "cousins"): "Collocation: In English, simply use 'cousins'.",
+            ("revert back", "reply"): "Redundant phrasing: 'revert back' is redundant; use 'reply' or 'revert'.",
+            ("reverting back", "replying"): "Redundant phrasing: use 'replying'.",
+            ("reverted back", "replied"): "Redundant phrasing: use 'replied'.",
+            ("do the needful", "take the necessary action"): "Archaic idiom: 'do the needful' should be replaced by 'take the necessary action'.",
+            ("out of station", "out of town"): "Idiom: In standard English, use 'out of town' rather than 'out of station'.",
+            ("prepone", "advance"): "Regional vocabulary: 'prepone' is Indian English; standard English uses 'advance' or 'reschedule earlier'.",
+            ("preponed", "advanced"): "Regional vocabulary: 'preponed' should be 'advanced' or 'rescheduled earlier'.",
+            ("cope up with", "cope with"): "Redundant preposition: In standard English, use 'cope with', not 'cope up with'.",
+        }
+        if (orig_lower, corr_lower) in indian_collocations:
+            return ("Indian English Collocation", indian_collocations[(orig_lower, corr_lower)], 0.95)
 
         # 6. Confused Words / Homophones
         confused_map = {

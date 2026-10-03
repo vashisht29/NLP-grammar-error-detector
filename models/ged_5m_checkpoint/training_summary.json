@@ -1,0 +1,10 @@
+{
+  "samples_trained": 5000000,
+  "target_target": "50 Lakh (5,000,000)",
+  "final_loss": 2.3804,
+  "final_f05_score": 0.6297,
+  "accelerator": "cpu",
+  "gpu_count": 8,
+  "precision": "FP32",
+  "status": "COMPLETED_SUCCESSFULLY"
+}

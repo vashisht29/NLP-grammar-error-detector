@@ -60,6 +60,20 @@ CHAT_SHORTCUTS: Dict[str, str] = {
     "gf": "girlfriend",
     "bro": "brother",
     "sis": "sister",
+    "fr": "for real",
+    "ngl": "not going to lie",
+    "brb": "be right back",
+    "fyi": "for your information",
+    "smh": "shaking my head",
+    "aka": "also known as",
+    "tldr": "too long; didn't read",
+    "thnx": "thanks",
+    "tysm": "thank you so much",
+    "np": "no problem",
+    "yw": "you are welcome",
+    "dunno": "do not know",
+    "sorta": "sort of",
+    "idc": "I do not care",
 }
 
 # Missing contraction apostrophes
@@ -264,6 +278,25 @@ SPLIT_COMPOUNDS: Dict[str, str] = {
     "guide line": "guideline",
     "guide lines": "guidelines",
     "life time": "lifetime",
+    "some time": "sometime",
+    "any time": "anytime",
+    "every time": "every time",
+    "smart phone": "smartphone",
+    "water fall": "waterfall",
+    "sun light": "sunlight",
+    "moon light": "moonlight",
+    "book mark": "bookmark",
+    "key board": "keyboard",
+    "note book": "notebook",
+    "text book": "textbook",
+    "news paper": "newspaper",
+    "head ache": "headache",
+    "tooth ache": "toothache",
+    "rain fall": "rainfall",
+    "snow fall": "snowfall",
+    "foot ball": "football",
+    "basket ball": "basketball",
+    "base ball": "baseball",
 }
 
 # Conversational greetings and informal openings
@@ -287,6 +320,27 @@ GREETING_PATTERNS: List[Tuple[str, str]] = [
     (r'\btq\b', "thank you"),
 ]
 
+# Indian English idioms and common regional calques
+INDIAN_ENGLISH_COLLOCATIONS: List[Tuple[str, str, str]] = [
+    (r'\bdiscuss\s+about\b', 'discuss', "Redundant preposition: 'discuss' is transitive and does not take 'about'."),
+    (r'\bdiscussed\s+about\b', 'discussed', "Redundant preposition: 'discussed' does not take 'about'."),
+    (r'\bdiscussing\s+about\b', 'discussing', "Redundant preposition: 'discussing' does not take 'about'."),
+    (r'\border\s+for\b(?=\s+(?:a|an|the|food|pizza|drinks|dinner|lunch|breakfast|[a-z]+))', 'order', "Redundant preposition: 'order' as a verb does not take 'for'."),
+    (r'\bpass(?:ed)?\s+out\s+from\s+(?:the\s+)?(college|school|university|institute)\b', r'graduated from \1', "Collocation: In standard English, use 'graduated from' (passing out refers to fainting)."),
+    (r'\brevert\s+back\b', 'reply', "Redundant phrasing: 'revert back' is redundant; use 'reply' or 'revert'."),
+    (r'\bcousin\s+(?:brother|sister)\b', 'cousin', "Collocation: In English, simply use 'cousin' rather than 'cousin brother/sister'."),
+    (r'\bcousins\s+(?:brothers|sisters)\b', 'cousins', "Collocation: In English, simply use 'cousins'."),
+    (r'\bdo\s+the\s+needful\b', 'take the necessary action', "Archaic idiom: 'do the needful' should be replaced by 'take the necessary action'."),
+    (r'\bout\s+of\s+station\b', 'out of town', "Idiom: In standard English, use 'out of town' rather than 'out of station'."),
+    (r'\bprepone\b', 'advance', "Regional vocabulary: 'prepone' is Indian English; standard English uses 'advance' or 'reschedule earlier'."),
+    (r'\bpreponed\b', 'advanced', "Regional vocabulary: 'preponed' should be 'advanced' or 'rescheduled earlier'."),
+    (r'\bpay\s+attention\s+on\b', 'pay attention to', "Preposition error: Use 'pay attention to', not 'pay attention on'."),
+    (r'\bcope\s+up\s+with\b', 'cope with', "Redundant preposition: In standard English, use 'cope with', not 'cope up with'."),
+    (r'\bgive\s+(?:an?\s+)?exam\b', 'take an exam', "Idiom / Calque: Students 'take an exam' (teachers 'give an exam')."),
+    (r'\bgiving\s+(?:an?\s+)?exam\b', 'taking an exam', "Idiom / Calque: Use 'taking an exam'."),
+    (r'\bgave\s+(?:an?\s+)?exam\b', 'took an exam', "Idiom / Calque: Use 'took an exam'."),
+]
+
 
 class ChatNormalizer:
     """
@@ -308,6 +362,12 @@ class ChatNormalizer:
             if re.search(pattern, revised, re.I):
                 revised = re.sub(pattern, unified, revised, flags=re.I)
                 changes.append({"original": split_form, "normalized": unified, "type": "Split Compound"})
+
+        # -0.8 Indian English Collocations and Redundant Prepositions
+        for pat, repl, desc in INDIAN_ENGLISH_COLLOCATIONS:
+            if re.search(pat, revised, re.I):
+                revised = re.sub(pat, repl, revised, flags=re.I)
+                changes.append({"original": pat, "normalized": repl, "type": "Indian English Collocation"})
 
         # -0.5. Informal Greetings and Opening Expressions (e.g. 'what sup' -> 'what\'s up')
         for pat, repl in GREETING_PATTERNS:

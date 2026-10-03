@@ -16,6 +16,7 @@ from .homophones import HomophoneEngine
 from .gender_collocations import GenderCollocationEngine
 from .chat_normalizer import ChatNormalizer
 from .lexicon import LexicalSemantics
+from .language_detector import HinglishDetector
 
 
 @dataclass
@@ -217,6 +218,32 @@ class DeepGrammarDetector:
                 errors=[],
                 overall_confidence=1.0,
                 processing_time_ms=0.0,
+                model_backend=self.backend
+            )
+
+        # 0. Hinglish / Non-English Language Detection Guardrail
+        is_hinglish, hinglish_conf, hinglish_markers = HinglishDetector.check_hinglish(clean_sentence)
+        if is_hinglish:
+            markers_str = ", ".join(f"'{m}'" for m in hinglish_markers[:3])
+            err = GrammarError(
+                error_id=1,
+                original_text=clean_sentence,
+                original_span=(0, len(clean_sentence)),
+                original_tokens=clean_sentence.split(),
+                suggested_text="Please enter standard English text.",
+                suggested_tokens=["Please", "enter", "standard", "English", "text."],
+                error_type="Language Mismatch (Hinglish Detected)",
+                explanation=f"Romanized Hindi / Hinglish phrasing detected ({markers_str}). This system is specifically trained for English Grammatical Error Detection. Please rewrite your sentence in standard English.",
+                confidence=round(hinglish_conf, 2)
+            )
+            return DetectionResult(
+                original_sentence=clean_sentence,
+                is_grammatically_correct=False,
+                error_count=1,
+                corrected_sentence="⚠️ Non-English (Hinglish) Detected. Please enter sentences in English only.",
+                errors=[err],
+                overall_confidence=round(hinglish_conf, 2),
+                processing_time_ms=round((time.perf_counter() - start_time) * 1000, 2),
                 model_backend=self.backend
             )
 
@@ -995,7 +1022,8 @@ class DeepGrammarDetector:
 
         KNOWN_MULTIWORD_SLANG = {
             'what sup', 'wat sup', 'whats up', 'wassup', 'wazzup', 'how r u', 'how are u',
-            'gud mrng', 'gud nyt', 'gm', 'gn'
+            'gud mrng', 'gud nyt', 'gm', 'gn', 'cousin brother', 'cousin sister',
+            'revert back', 'do the needful', 'out of station', 'cope up with'
         }
 
         def decompose_and_process(start_i, end_i, start_j, end_j):
