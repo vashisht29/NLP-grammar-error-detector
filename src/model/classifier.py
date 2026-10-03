@@ -110,6 +110,17 @@ class ErrorClassifier:
                     0.96
                 )
 
+        # 4a. Split Compound Words (e.g. 'wel come' -> 'welcome', 'with out' -> 'without')
+        if len(orig_tokens) > len(corr_tokens):
+            orig_no_space = "".join(orig_tokens).lower()
+            corr_no_space = "".join(corr_tokens).lower().rstrip(",.!?")
+            if orig_no_space == corr_no_space:
+                return (
+                    "Compound Word / Spacing",
+                    f"Compound word error: '{orig_str}' should be written as a single combined word '{corr_str}'.",
+                    0.96
+                )
+
         # 4b. Jumbled Letter Typo / Typoglycemia (e.g. mtiaske -> mistake, porject -> project)
         if len(orig_tokens) == 1 and len(corr_tokens) == 1 and len(orig_lower) >= 4 and len(corr_lower) >= 4:
             if orig_lower[0] == corr_lower[0] and orig_lower[-1] == corr_lower[-1] and sorted(orig_lower[1:-1]) == sorted(corr_lower[1:-1]) and orig_lower != corr_lower:
@@ -119,12 +130,17 @@ class ErrorClassifier:
                     0.96
                 )
 
-        # 5. Informal Chat Slang & Shorthand (e.g. u -> you, pls -> please, bcoz -> because)
-        if orig_str.lower() in ("u", "r", "pls", "plz", "thx", "ty", "bcoz", "cuz", "bcz", "wanna", "gonna", "lemme", "kinda", "idk", "btw", "imo", "omg", "tbh"):
+        # 5. Informal Chat Slang & Shorthand (e.g. u -> you, what sup -> what's up, pls -> please)
+        chat_slang_words = (
+            "u", "r", "pls", "plz", "thx", "ty", "bcoz", "cuz", "bcz", "wanna", "gonna",
+            "lemme", "kinda", "idk", "btw", "imo", "omg", "tbh", "what sup", "whats up",
+            "wassup", "wazzup", "wat sup", "wats up", "sup", "how r u", "hru", "wru", "wyd"
+        )
+        if orig_lower in chat_slang_words or orig_lower.startswith("what sup") or orig_lower.startswith("whats up"):
             return (
                 "Informal Chat Slang",
-                f"Informal chat shorthand: '{orig_str}' converted to standard English '{corr_str}'.",
-                0.94
+                f"Informal conversational expression '{orig_str}' converted to standard English '{corr_str}'.",
+                0.95
             )
 
         # 6. Confused Words / Homophones
@@ -262,6 +278,13 @@ class ErrorClassifier:
 
         # 3. Preposition errors
         if cls._is_preposition_error(orig_tokens, corr_tokens):
+            if not corr_tokens or not corr_str:
+                after_info = f" before '{context_after[0]}'" if context_after else ""
+                return (
+                    "Redundant Preposition",
+                    f"Redundant preposition: '{orig_str}' should be omitted{after_info} in standard English.",
+                    0.93
+                )
             return (
                 "Preposition Error",
                 f"Incorrect preposition '{orig_str}'. The correct idiom/collocation requires '{corr_str}'.",

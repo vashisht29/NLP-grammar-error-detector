@@ -892,7 +892,7 @@ class DeepGrammarDetector:
         corrected = re.sub(r'\ba\s+(' + vowel_sound_words + r')\b', r'an \1', corrected, flags=re.IGNORECASE)
         corrected = re.sub(r'\ban\s+(' + consonant_sound_words + r')\b', r'a \1', corrected, flags=re.IGNORECASE)
 
-        # 13. Common Preposition idioms
+        # 13. Common Preposition idioms & Redundant Prepositions
         prep_mappings = [
             (r'\binterested\s+on\b', 'interested in'),
             (r'\bgood\s+in\s+playing\b', 'good at playing'),
@@ -900,6 +900,12 @@ class DeepGrammarDetector:
             (r'\bdepend\s+of\b', 'depend on'),
             (r'\bmarried\s+with\b', 'married to'),
             (r'\bcongratulate\s+for\b', 'congratulate on'),
+            (r'\b(welcome|come|came|comes|coming|go|goes|went|going|gone|arrive|arrived|arrives|arriving|walk|walked|walking|drive|drove|driving|return|returned|returning|head|headed|heading|reach|reached|reaching|back)\s+to\s+home\b', r'\1 home'),
+            (r'\b(discuss|discussed|discussing|discusses)\s+about\b', r'\1'),
+            (r'\b(order|ordered|ordering|orders)\s+for\b(?=\s+(?:a|an|the|food|pizza|drinks|dinner|lunch|breakfast|[a-z]+))', r'\1'),
+            (r'\b(enter|entered|entering|enters)\s+into\b(?=\s+(?:the\s+)?(?:room|building|hall|house|office|class))', r'\1'),
+            (r'\b(comprise|comprises|comprised)\s+of\b', r'\1'),
+            (r'\bcope\s+up\s+with\b', 'cope with'),
         ]
         for pat, repl in prep_mappings:
             corrected = re.sub(pat, repl, corrected, flags=re.IGNORECASE)
@@ -939,63 +945,19 @@ class DeepGrammarDetector:
         errors = []
         error_id = 1
 
-        for tag, i1, i2, j1, j2 in opcodes:
-            if tag == "equal":
-                continue
+        def emit_error(start_i, end_i, start_j, end_j):
+            nonlocal error_id
+            sub_orig_tokens = orig_words[start_i:end_i]
+            sub_corr_tokens = corr_words[start_j:end_j]
+            if sub_orig_tokens == sub_corr_tokens:
+                return
 
-            orig_slice_tokens = orig_words[i1:i2]
-            corr_slice_tokens = corr_words[j1:j2]
-
-            # Decompose parallel multi-token replacements for granular error reporting
-            if (i2 - i1) > 1 and (i2 - i1) == (j2 - j1):
-                for k in range(i2 - i1):
-                    o_idx = i1 + k
-                    c_idx = j1 + k
-                    o_tok = orig_words[o_idx]
-                    c_tok = corr_words[c_idx]
-                    if o_tok == c_tok:
-                        continue
-                    o_meta = orig_tokens_meta[o_idx]
-                    s_char, e_char = o_meta[1], o_meta[2]
-                    o_span = original[s_char:e_char]
-
-                    c_before = orig_words[max(0, o_idx - 7):o_idx]
-                    c_after = orig_words[o_idx + 1:min(len(orig_words), o_idx + 5)]
-
-                    cat, expl, conf = ErrorClassifier.classify(
-                        orig_tokens=[o_tok],
-                        corr_tokens=[c_tok],
-                        context_before=c_before,
-                        context_after=c_after
-                    )
-
-                    errors.append(GrammarError(
-                        error_id=error_id,
-                        original_text=o_span,
-                        original_span=(s_char, e_char),
-                        original_tokens=[o_tok],
-                        suggested_text=c_tok,
-                        suggested_tokens=[c_tok],
-                        error_type=cat,
-                        explanation=expl,
-                        confidence=conf
-                    ))
-                    error_id += 1
-                continue
-
-            # Peel off trailing punctuation added to a word if original lacked it
-            trailing_punct = None
-            if len(corr_slice_tokens) > len(orig_slice_tokens) and corr_slice_tokens[-1] in {'.', '!', '?', ';'}:
-                if not orig_slice_tokens or orig_slice_tokens[-1] not in {'.', '!', '?', ';'}:
-                    trailing_punct = corr_slice_tokens.pop()
-
-            # Calculate character span in the original text
-            if i1 < len(orig_tokens_meta) and i2 <= len(orig_tokens_meta) and i1 < i2:
-                start_char = orig_tokens_meta[i1][1]
-                end_char = orig_tokens_meta[i2 - 1][2]
+            if start_i < len(orig_tokens_meta) and end_i <= len(orig_tokens_meta) and start_i < end_i:
+                start_char = orig_tokens_meta[start_i][1]
+                end_char = orig_tokens_meta[end_i - 1][2]
                 orig_span_text = original[start_char:end_char]
-            elif i1 < len(orig_tokens_meta):
-                start_char = orig_tokens_meta[i1][1]
+            elif start_i < len(orig_tokens_meta):
+                start_char = orig_tokens_meta[start_i][1]
                 end_char = start_char
                 orig_span_text = ""
             else:
@@ -1003,49 +965,85 @@ class DeepGrammarDetector:
                 end_char = len(original)
                 orig_span_text = ""
 
-            corr_span_text = " ".join(corr_slice_tokens)
+            corr_span_text = " ".join(sub_corr_tokens)
 
-            # Extract context before and after the error
-            context_before = orig_words[max(0, i1 - 7):i1]
-            context_after = orig_words[i2:min(len(orig_words), i2 + 5)]
+            context_before = orig_words[max(0, start_i - 7):start_i]
+            context_after = orig_words[end_i:min(len(orig_words), end_i + 5)]
 
-            # Classify the error category
             category, explanation, confidence = ErrorClassifier.classify(
-                orig_tokens=orig_slice_tokens,
-                corr_tokens=corr_slice_tokens,
+                orig_tokens=sub_orig_tokens,
+                corr_tokens=sub_corr_tokens,
                 context_before=context_before,
                 context_after=context_after
             )
 
-            # Skip trivial identical-case punctuation match if confidence is too low
             if orig_span_text == corr_span_text:
-                continue
+                return
 
             errors.append(GrammarError(
                 error_id=error_id,
                 original_text=orig_span_text,
                 original_span=(start_char, end_char),
-                original_tokens=orig_slice_tokens,
+                original_tokens=sub_orig_tokens,
                 suggested_text=corr_span_text,
-                suggested_tokens=corr_slice_tokens,
+                suggested_tokens=sub_corr_tokens,
                 error_type=category,
                 explanation=explanation,
                 confidence=confidence
             ))
             error_id += 1
 
-            if trailing_punct:
-                errors.append(GrammarError(
-                    error_id=error_id,
-                    original_text="",
-                    original_span=(len(original), len(original)),
-                    original_tokens=[],
-                    suggested_text=trailing_punct,
-                    suggested_tokens=[trailing_punct],
-                    error_type="Punctuation",
-                    explanation=f"Missing terminal punctuation '{trailing_punct}' added.",
-                    confidence=0.95
-                ))
-                error_id += 1
+        KNOWN_MULTIWORD_SLANG = {
+            'what sup', 'wat sup', 'whats up', 'wassup', 'wazzup', 'how r u', 'how are u',
+            'gud mrng', 'gud nyt', 'gm', 'gn'
+        }
+
+        def decompose_and_process(start_i, end_i, start_j, end_j):
+            o_toks = orig_words[start_i:end_i]
+            c_toks = corr_words[start_j:end_j]
+
+            # 1. Known multi-word slang phrases: keep unified as one error
+            if " ".join(o_toks).lower() in KNOWN_MULTIWORD_SLANG:
+                emit_error(start_i, end_i, start_j, end_j)
+                return
+
+            # 2. Compound word merger decomposition (e.g. 'wel come' -> 'welcome')
+            if len(o_toks) > 1:
+                for a in range(len(o_toks) - 1):
+                    combo = (o_toks[a] + o_toks[a + 1]).lower()
+                    for b in range(len(c_toks)):
+                        if c_toks[b].lower().rstrip(',.!?') == combo:
+                            if a > 0 or b > 0:
+                                decompose_and_process(start_i, start_i + a, start_j, start_j + b)
+                            emit_error(start_i + a, start_i + a + 2, start_j + b, start_j + b + 1)
+                            if (a + 2 < len(o_toks)) or (b + 1 < len(c_toks)):
+                                decompose_and_process(start_i + a + 2, end_i, start_j + b + 1, end_j)
+                            return
+
+            # 3. Compound word split decomposition (e.g. 'alot' -> 'a lot')
+            if len(c_toks) > 1:
+                for a in range(len(o_toks)):
+                    for b in range(len(c_toks) - 1):
+                        combo = (c_toks[b] + c_toks[b + 1]).lower()
+                        if o_toks[a].lower().rstrip(',.!?') == combo:
+                            if a > 0 or b > 0:
+                                decompose_and_process(start_i, start_i + a, start_j, start_j + b)
+                            emit_error(start_i + a, start_i + a + 1, start_j + b, start_j + b + 2)
+                            if (a + 1 < len(o_toks)) or (b + 2 < len(c_toks)):
+                                decompose_and_process(start_i + a + 1, end_i, start_j + b + 2, end_j)
+                            return
+
+            # 4. Parallel token replacements
+            if len(o_toks) > 1 and len(o_toks) == len(c_toks):
+                for k in range(len(o_toks)):
+                    emit_error(start_i + k, start_i + k + 1, start_j + k, start_j + k + 1)
+                return
+
+            emit_error(start_i, end_i, start_j, end_j)
+
+        for tag, i1, i2, j1, j2 in opcodes:
+            if tag == "equal":
+                continue
+            decompose_and_process(i1, i2, j1, j2)
 
         return errors

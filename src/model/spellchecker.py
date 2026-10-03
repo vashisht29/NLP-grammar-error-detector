@@ -15,6 +15,7 @@ from typing import Optional, Set, List, Dict, Tuple
 
 # Core high-priority human typos
 CURATED_TYPOS: Dict[str, str] = {
+    "wel": "well",
     "speeling": "spelling",
     "speling": "spelling",
     "mistak": "mistake",

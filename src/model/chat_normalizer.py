@@ -215,6 +215,78 @@ CONVERSATIONAL_TYPOS: Dict[str, str] = {
     "tommorow": "tomorrow",
 }
 
+# Split compound words (e.g. 'wel come' -> 'welcome', 'with out' -> 'without')
+SPLIT_COMPOUNDS: Dict[str, str] = {
+    "wel come": "welcome",
+    "wel comes": "welcomes",
+    "wel coming": "welcoming",
+    "wel comed": "welcomed",
+    "with out": "without",
+    "in to": "into",
+    "on to": "onto",
+    "can not": "cannot",
+    "every where": "everywhere",
+    "some where": "somewhere",
+    "any where": "anywhere",
+    "no where": "nowhere",
+    "every thing": "everything",
+    "some thing": "something",
+    "any thing": "anything",
+    "no thing": "nothing",
+    "every body": "everybody",
+    "some body": "somebody",
+    "any body": "anybody",
+    "no body": "nobody",
+    "every one": "everyone",
+    "some one": "someone",
+    "any one": "anyone",
+    "my self": "myself",
+    "your self": "yourself",
+    "him self": "himself",
+    "her self": "herself",
+    "it self": "itself",
+    "our selves": "ourselves",
+    "them selves": "themselves",
+    "pass word": "password",
+    "user name": "username",
+    "back ground": "background",
+    "on line": "online",
+    "off line": "offline",
+    "break through": "breakthrough",
+    "air port": "airport",
+    "feed back": "feedback",
+    "time line": "timeline",
+    "work flow": "workflow",
+    "work place": "workplace",
+    "home work": "homework",
+    "class room": "classroom",
+    "super market": "supermarket",
+    "guide line": "guideline",
+    "guide lines": "guidelines",
+    "life time": "lifetime",
+}
+
+# Conversational greetings and informal openings
+GREETING_PATTERNS: List[Tuple[str, str]] = [
+    (r'\b(what|wat)\s+sup\b', "what's up"),
+    (r'\bwassup\b', "what's up"),
+    (r'\bwazzup\b', "what's up"),
+    (r'\bwats\s+up\b', "what's up"),
+    (r'\bwhats\s+up\b', "what's up"),
+    (r'\bhow\s+r\s+u\b', "how are you"),
+    (r'\bhow\s+are\s+u\b', "how are you"),
+    (r'\bhru\b', "how are you"),
+    (r'\bwru\b', "where are you"),
+    (r'\bwyd\b', "what are you doing"),
+    (r'\bwbu\b', "what about you"),
+    (r'\bhbu\b', "how about you"),
+    (r'\bgud\s+mrng\b', "good morning"),
+    (r'\bgud\s+nyt\b', "good night"),
+    (r'\bgn\b', "good night"),
+    (r'\bgm\b', "good morning"),
+    (r'\btq\b', "thank you"),
+]
+
 
 class ChatNormalizer:
     """
@@ -229,6 +301,22 @@ class ChatNormalizer:
         """
         revised = text
         changes = []
+
+        # -1. Split Compound Words (e.g. 'wel come' -> 'welcome', 'with out' -> 'without')
+        for split_form, unified in SPLIT_COMPOUNDS.items():
+            pattern = rf'\b{split_form}\b'
+            if re.search(pattern, revised, re.I):
+                revised = re.sub(pattern, unified, revised, flags=re.I)
+                changes.append({"original": split_form, "normalized": unified, "type": "Split Compound"})
+
+        # -0.5. Informal Greetings and Opening Expressions (e.g. 'what sup' -> 'what\'s up')
+        for pat, repl in GREETING_PATTERNS:
+            if re.search(pat, revised, re.I):
+                revised = re.sub(pat, repl, revised, flags=re.I)
+                changes.append({"original": pat, "normalized": repl, "type": "Chat Greeting"})
+
+        # Separate greeting followed directly by another sentence or clause
+        revised = re.sub(r"\b(what's up)\s+([a-zA-Z])\b", r"\1, \2", revised, flags=re.I)
 
         # 0. Missing space after punctuation and capitalize new sentence after ?, !, and .
         revised = re.sub(r'([A-Za-z])([!?])\s*([a-z])', lambda m: f'{m.group(1)}{m.group(2)} {m.group(3).upper()}', revised)
