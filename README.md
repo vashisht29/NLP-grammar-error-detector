@@ -1,12 +1,15 @@
 # NLP Grammar Error Detector
 
+[![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-nlp--grammar--error--detector.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://nlp-grammar-error-detector.vercel.app)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
+
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg)](https://pytorch.org/)
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-yellow.svg)](https://huggingface.co/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Inference: Zero--Cost](https://img.shields.io/badge/Inference-Zero--Cost%20Local-purple.svg)](#)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvashisht29%2FNLP-grammar-error-detector)
-[![Deploy to Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=vashisht29/NLP-grammar-error-detector&branch=main&mainModule=app.py)
+
+> 🌐 **Official Live URL:** **[https://nlp-grammar-error-detector.vercel.app](https://nlp-grammar-error-detector.vercel.app)**  
+> Real-time grammatical error detection, deep sequence-to-sequence transformer corrections, and linguistic taxonomy breakdowns live on the web.
 
 An enterprise-grade, high-performance **Deep Learning & Statistical Hybrid Grammatical Error Detection (GED)** and correction system. Built with fine-tuned Sequence-to-Sequence Transformers (`T5`), symmetric deletion lookup tables, statistical n-gram perplexity scoring, and a modern Apple-inspired interactive web dashboard.
 
