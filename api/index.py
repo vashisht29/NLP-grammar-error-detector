@@ -29,21 +29,28 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        if parsed.path in ("/", "/index.html", "/api/index.py"):
-            self._set_headers(200, content_type="text/html")
-            self.wfile.write(HTML_DASHBOARD.encode("utf-8"))
-        elif parsed.path == "/status":
-            self._set_headers(200)
-            resp = {
+        if parsed.path == "/status":
+            resp = json.dumps({
                 "status": "online",
                 "model_backend": detector.backend,
                 "device": detector.device,
                 "platform": "Vercel Serverless"
-            }
-            self.wfile.write(json.dumps(resp).encode("utf-8"))
+            }).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(resp)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(resp)
         else:
-            self._set_headers(200, content_type="text/html")
-            self.wfile.write(HTML_DASHBOARD.encode("utf-8"))
+            data = HTML_DASHBOARD.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(data)
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -54,11 +61,23 @@ class handler(BaseHTTPRequestHandler):
                 payload = json.loads(post_body.decode("utf-8"))
                 sentence = payload.get("sentence", "")
                 result = detector.detect(sentence)
-                self._set_headers(200)
-                self.wfile.write(json.dumps(result.to_dict()).encode("utf-8"))
+                resp = json.dumps(result.to_dict()).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(resp)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(resp)
             except Exception as e:
-                self._set_headers(400)
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+                err_resp = json.dumps({"error": str(e)}).encode("utf-8")
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(err_resp)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(err_resp)
         else:
-            self._set_headers(404)
+            self.send_response(404)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
             self.wfile.write(b'{"error": "Not found"}')

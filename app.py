@@ -1136,8 +1136,8 @@ else:
     </style>
 </head>
 <body>
-    <!-- 🔐 FRONT LOGIN SCREEN -->
-    <div class="auth-wrapper" id="loginView">
+    <!-- 🔐 FRONT LOGIN SCREEN (DEFAULT VISIBLE) -->
+    <div class="auth-wrapper" id="loginView" style="display: flex;">
         <div class="auth-logo-badge">
             <span>✨ DeepGrammar AI</span>
         </div>
