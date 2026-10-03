@@ -1594,8 +1594,9 @@ else:
 
 
         // --- 🔐 AUTHENTICATION LOGIC ---
+        // Guarantees that opening the link always displays the Front Login Gate first!
         function checkAuthState() {
-            const user = localStorage.getItem('ged_user');
+            const user = sessionStorage.getItem('ged_user');
             const loginView = document.getElementById('loginView');
             const mainView = document.getElementById('mainAppView');
             const nameLabel = document.getElementById('userNameLabel');
@@ -1620,17 +1621,18 @@ else:
             if (e) e.preventDefault();
             const usernameInput = document.getElementById('loginUsername');
             const username = (usernameInput && usernameInput.value.trim()) || 'Harsh Vashisht';
-            localStorage.setItem('ged_user', username);
+            sessionStorage.setItem('ged_user', username);
             checkAuthState();
         }
 
         function handleGuestLogin() {
-            localStorage.setItem('ged_user', 'Guest Researcher');
+            sessionStorage.setItem('ged_user', 'Guest Researcher');
             checkAuthState();
         }
 
         function handleSignOut() {
-            localStorage.removeItem('ged_user');
+            sessionStorage.removeItem('ged_user');
+            try { localStorage.removeItem('ged_user'); } catch(e){}
             checkAuthState();
         }
 
@@ -1662,6 +1664,7 @@ else:
 
         // Run once on initial page load
         window.addEventListener('DOMContentLoaded', () => {
+            try { localStorage.removeItem('ged_user'); } catch(e){}
             checkAuthState();
         });
     </script>
