@@ -5,8 +5,28 @@
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-yellow.svg)](https://huggingface.co/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Inference: Zero--Cost](https://img.shields.io/badge/Inference-Zero--Cost%20Local-purple.svg)](#)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvashisht29%2FNLP-grammar-error-detector)
+[![Deploy to Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=vashisht29/NLP-grammar-error-detector&branch=main&mainModule=app.py)
 
 An enterprise-grade, high-performance **Deep Learning & Statistical Hybrid Grammatical Error Detection (GED)** and correction system. Built with fine-tuned Sequence-to-Sequence Transformers (`T5`), symmetric deletion lookup tables, statistical n-gram perplexity scoring, and a modern Apple-inspired interactive web dashboard.
+
+---
+
+## ☁️ 1-Click Free Cloud Deployment
+
+You can deploy this application live on the web in 1 click:
+
+### Option 1: Deploy to Vercel (Instant Serverless Live URL)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvashisht29%2FNLP-grammar-error-detector)
+- Connects automatically to your GitHub repo.
+- Deploys the complete Front Login UI and real-time error detector via Vercel Python Serverless.
+- Free continuous HTTPS domain (e.g. `https://nlp-grammar-error-detector.vercel.app`).
+
+### Option 2: Deploy to Streamlit Community Cloud (Dedicated Full Transformer)
+[![Deploy to Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=vashisht29/NLP-grammar-error-detector&branch=main&mainModule=app.py)
+- Runs the full neural model with dedicated RAM.
+- 100% free hosted on Streamlit Cloud.
+
 
 ---
 
