@@ -411,44 +411,28 @@ class DeepGrammarDetector:
             return self._run_single_sentence_pipeline(clean_sentence)
 
     def _run_single_sentence_pipeline(self, sentence: str) -> str:
-        # Step 1: Pre-process with NLP Linguistic & Spell-Checking Engine
-        normalized = self._heuristic_correction(sentence)
-
         if self.model is not None and self.tokenizer is not None:
             try:
                 import torch
                 # Prefix prompt for T5 grammar models
-                input_text = f"gec: {normalized}" if "t5" in self.config.model_name.lower() else normalized
+                input_text = f"gec: {sentence}" if "t5" in self.config.model_name.lower() else sentence
                 inputs = self.tokenizer(input_text, return_tensors="pt", max_length=self.config.max_length, truncation=True)
 
                 if self.device in ("mps", "cuda"):
                     inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
                 token_count = inputs["input_ids"].shape[1]
-                gen_max_len = min(self.config.max_length, max(token_count + 14, 24))
+                gen_max_len = min(self.config.max_length, max(token_count + 24, 32))
 
                 with torch.no_grad():
                     outputs = self.model.generate(
                         **inputs,
                         max_length=gen_max_len,
-                        num_beams=2,
+                        num_beams=4,
                         early_stopping=True
                     )
                 neural_output = self.tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
                 neural_output = re.sub(r"\b(what|that|it|there|who|how|here)'s(up|a|an|the|good|ready|nice|coming)\b", r"\1's \2", neural_output, flags=re.I)
-
-                # Neural Hallucination Guard: Ensure Transformer never invents non-existent English words
-                words = re.findall(r'\b[A-Za-z]+\b', neural_output)
-                for w in words:
-                    if not SpellChecker.is_valid_word(w):
-                        cand = SpellChecker.correct_word(w)
-                        if cand:
-                            neural_output = re.sub(r'\b' + re.escape(w) + r'\b', cand, neural_output)
-
-                # Protect subject pronoun consistency (prevent neural model from distorting 'you' to 'we' / 'I')
-                if re.search(r'\byou\b', sentence, re.I) and not re.search(r'\bwe\b', sentence, re.I):
-                    neural_output = re.sub(r'\b(are|were|do|did|can|could|will|would|should)\s+we\b', r'\1 you', neural_output, flags=re.I)
-                    neural_output = re.sub(r'\bwe\s+(are|were|have|can|could|will|would|should)\b', r'you \1', neural_output, flags=re.I)
 
                 # Protect relative clause structure (prevent neural model from dropping relative pronoun clause 'who was/is')
                 if re.search(r'\b(which|who)\s+(was|were|is|are)\b', sentence, re.I):
@@ -460,13 +444,22 @@ class DeepGrammarDetector:
                         flags=re.I
                     )
 
-                # Step 2: Post-process to ensure all linguistic constraints are preserved
-                return self._heuristic_correction(neural_output)
+                # Fix spacing on split compound words if present in neural output (e.g. "class room" -> "classroom")
+                neural_output = re.sub(r'\bclass\s+room\b', 'classroom', neural_output, flags=re.I)
+                neural_output = re.sub(r'\bwith\s+out\b', 'without', neural_output, flags=re.I)
+
+                # Capitalize first letter and ensure ending punctuation
+                if neural_output and neural_output[0].islower():
+                    neural_output = neural_output[0].upper() + neural_output[1:]
+                if neural_output and not neural_output.endswith(('.', '!', '?', '."', '!"', '?"', ".'", "!'", "?'")):
+                    neural_output += '.'
+
+                return neural_output
             except Exception as e:
                 print(f"[DeepGrammarDetector] Transformer inference error ({e}), falling back to heuristic.")
 
         # Fallback if model weights not active
-        return normalized
+        return self._heuristic_correction(sentence)
 
     def _heuristic_correction(self, text: str) -> str:
         corrected = text
@@ -717,24 +710,6 @@ class DeepGrammarDetector:
         ]
         for pattern, repl in collective_patterns:
             corrected = re.sub(pattern, repl, corrected, flags=re.IGNORECASE)
-
-        # Collective Noun Pronoun-Antecedent Agreement: "The research team ... their report" -> "its report"
-        def fix_collective_pronoun(txt):
-            pat = (
-                r'\b((?:the\s+|a\s+|an\s+)?(?:[\w\-]+\s+)?(?:' + collective_nouns + r'))'
-                r'(\b(?:\s+(?:which|that|who))?[^.;]*?\b)their\s+([A-Za-z]+)\b'
-            )
-            def repl(m):
-                subj = m.group(1)
-                mid = m.group(2)
-                noun = m.group(3)
-                subj_last = subj.strip().split()[-1].lower()
-                if subj_last.endswith('s') and not subj_last.endswith(('ss', 'us')):
-                    return m.group(0)  # Plural like 'teams', keep 'their'
-                return f'{subj}{mid}its {noun}'
-            return re.sub(pat, repl, txt, flags=re.IGNORECASE)
-
-        corrected = fix_collective_pronoun(corrected)
 
         # Correlative Conjunction SVA (Proximity Rule): "neither A nor B were" -> "was" (verb agrees with B)
         def fix_correlative_conjunction(txt):

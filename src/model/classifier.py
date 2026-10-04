@@ -319,7 +319,61 @@ class ErrorClassifier:
             )
 
 
-        # 1a. Relative Pronoun Concord (e.g. which -> who/whom/whose after human antecedent)
+        # 1a. Infinitive Verb Form after 'to' (e.g. forgot to brought -> forgot to bring)
+        if any(w.lower() == "to" for w in context_before[-2:]) and (orig_lower in ("brought", "went", "saw", "came", "wrote", "took", "ate", "spoke", "found", "did", "had") or orig_lower.endswith("ed")):
+            return (
+                "Infinitive Verb Form",
+                f"Infinitive verb error: The infinitive marker 'to' requires the base verb form '{corr_str}', not past form '{orig_str}'.",
+                0.97
+            )
+
+        # 1b. Irregular Past & Tense Mappings
+        IRREGULAR_PAST_MAP = {
+            ("speaked", "spoke"): "Irregular past tense: 'speak' has the irregular past form 'spoke', not 'speaked'.",
+            ("eated", "ate"): "Irregular past tense: 'eat' has the irregular past form 'ate'.",
+            ("goed", "went"): "Irregular past tense: 'go' has the irregular past form 'went'.",
+            ("taked", "took"): "Irregular past tense: 'take' has the irregular past form 'took'.",
+            ("writed", "wrote"): "Irregular past tense: 'write' has the irregular past form 'wrote'.",
+            ("runned", "ran"): "Irregular past tense: 'run' has the irregular past form 'ran'.",
+            ("sleeped", "slept"): "Irregular past tense: 'sleep' has the irregular past form 'slept'.",
+            ("catched", "caught"): "Irregular past tense: 'catch' has the irregular past form 'caught'.",
+            ("buyed", "bought"): "Irregular past tense: 'buy' has the irregular past form 'bought'.",
+            ("bringed", "brought"): "Irregular past tense: 'bring' has the irregular past form 'brought'.",
+            ("teached", "taught"): "Irregular past tense: 'teach' has the irregular past form 'taught'.",
+            ("thinked", "thought"): "Irregular past tense: 'think' has the irregular past form 'thought'.",
+            ("begin", "began"): "Verb tense agreement: Past narrative context requires the irregular past tense 'began'.",
+            ("begins", "began"): "Verb tense agreement: Past narrative context requires the irregular past tense 'began'.",
+            ("say", "said"): "Verb tense agreement: Past narrative context requires the past tense 'said'.",
+            ("says", "said"): "Verb tense agreement: Past narrative context requires the past tense 'said'.",
+            ("ask", "asked"): "Verb tense agreement: Past narrative context requires the past tense form 'asked'.",
+            ("asks", "asked"): "Verb tense agreement: Past narrative context requires the past tense form 'asked'.",
+            ("fastly", "fast"): "Adverb choice: 'fastly' is not a standard English word; 'fast' functions as both an adjective and an adverb.",
+            ("soak", "soaked"): "Resultative adjective / participle: State following 'got completely' requires past participle 'soaked'.",
+        }
+        if (orig_lower, corr_lower) in IRREGULAR_PAST_MAP:
+            msg = IRREGULAR_PAST_MAP[(orig_lower, corr_lower)]
+            cat = "Irregular Past Verb" if "Irregular" in msg else ("Adverb Choice" if "Adverb" in msg else "Verb Tense & Form")
+            return (cat, msg, 0.97)
+
+        # 1c. Modal Auxiliary Concord (e.g. cannot understood -> cannot understand)
+        if any(w.lower() in ("cannot", "can't", "could", "couldn't", "should", "shouldn't", "would", "wouldn't", "must", "might") for w in context_before[-3:]):
+            if (orig_lower in ("understood", "went", "saw", "came", "wrote", "took", "knew", "ate", "spoke") or orig_lower.endswith("ed")):
+                return (
+                    "Modal Auxiliary Concord",
+                    f"Modal auxiliary error: Modal verb requires the base infinitive form '{corr_str}', not past tense '{orig_str}'.",
+                    0.97
+                )
+
+        # 1d. Double Negative (e.g. cannot ... nothing -> cannot ... what he said / anything)
+        if orig_lower in ("nothing", "nobody", "nowhere") and (corr_lower in ("anything", "anybody", "anywhere", "what") or "what" in corr_lower):
+            if any(w.lower() in ("cannot", "can't", "couldn't", "don't", "didn't", "never", "hardly", "scarcely", "not") for w in context_before[-6:]):
+                return (
+                    "Double Negative",
+                    f"Double negative error: In standard English, use '{corr_str}' after a negative verb/modal to avoid double negation with '{orig_str}'.",
+                    0.96
+                )
+
+        # 1e. Relative Pronoun Concord (e.g. which -> who/whom/whose after human antecedent)
         if orig_lower == "which" and corr_lower in ("who", "whom", "whose"):
             return (
                 "Relative Pronoun Concord",

@@ -285,6 +285,8 @@ class SpellChecker:
             "up", "out", "down", "off", "back", "away", "over", "into", "through", "during", "before", "after", "above", "below", "between", "under",
             "there", "here", "where", "when", "why", "how", "what", "which", "who", "whom", "whose",
             "not", "no", "yes", "and", "or", "but", "so", "because", "if", "than", "then", "as", "of",
+            "cannot", "can", "could", "would", "should", "will", "shall", "may", "might", "must",
+            "fast", "fastly", "slow", "slowly",
             "very", "too", "also", "just", "now", "well", "all", "any", "some", "every", "each",
             "home", "house", "car", "room", "book", "water", "food", "people", "child", "children",
             "man", "men", "woman", "women", "friend", "friends", "help", "need", "like", "love",
