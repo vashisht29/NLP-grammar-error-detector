@@ -414,8 +414,22 @@ class DeepGrammarDetector:
         if self.model is not None and self.tokenizer is not None:
             try:
                 import torch
-                # Prefix prompt for T5 grammar models
-                input_text = f"gec: {sentence}" if "t5" in self.config.model_name.lower() else sentence
+                # Step 1: Pre-resolve genuine non-words (typos, typoglycemia scrambled letters) without touching valid words
+                def fix_non_word_typo(m):
+                    w = m.group()
+                    if not SpellChecker.is_valid_word(w):
+                        cand = SpellChecker.correct_word(w)
+                        return cand if cand else w
+                    return w
+                preprocessed = re.sub(r'\b[A-Za-z]+\b', fix_non_word_typo, sentence)
+                preprocessed = re.sub(r'\bclass\s+room\b', 'classroom', preprocessed, flags=re.I)
+                preprocessed = re.sub(r'\bwith\s+out\b', 'without', preprocessed, flags=re.I)
+
+                # Step 2: Contextual confused words / homophones (their/there/they're, its/it's, affect/effect)
+                preprocessed, _ = HomophoneEngine.apply(preprocessed)
+
+                # Step 3: Neural Seq2Seq Deep Transformer Generation
+                input_text = f"gec: {preprocessed}" if "t5" in self.config.model_name.lower() else preprocessed
                 inputs = self.tokenizer(input_text, return_tensors="pt", max_length=self.config.max_length, truncation=True)
 
                 if self.device in ("mps", "cuda"):
